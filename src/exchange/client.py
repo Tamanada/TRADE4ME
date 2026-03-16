@@ -14,6 +14,7 @@ class ExchangeClient:
         exchange_name: str = "binance",
         api_key: Optional[str] = None,
         api_secret: Optional[str] = None,
+        password: Optional[str] = None,
         sandbox: bool = True,
     ):
         self.exchange_name = exchange_name
@@ -30,6 +31,8 @@ class ExchangeClient:
         if api_key and api_secret:
             config["apiKey"] = api_key
             config["secret"] = api_secret
+        if password:
+            config["password"] = password  # Pour KuCoin, OKX (passphrase)
 
         self.exchange: ccxt.Exchange = exchange_class(config)
 

@@ -473,27 +473,35 @@
             </span>
         </div>
     </div>
+
+    <!-- Execution History -->
+    <div id="exec-history" style="margin-top:24px;display:none">
+        <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-dim)">Historique des executions</h3>
+        <div id="exec-history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
 </div>
 
-<!-- Buy Confirmation Modal -->
+<!-- Execution Modal -->
 <div class="modal-overlay" id="buy-modal">
-    <div class="modal">
-        <h3 id="modal-title">Confirmer l'achat</h3>
-        <p id="modal-desc"></p>
+    <div class="modal" style="max-width:500px">
+        <h3 id="modal-title">Executer Arbitrage</h3>
+        <p id="modal-desc" style="font-size:13px;color:var(--text-dim)"></p>
         <div class="detail" id="modal-detail"></div>
-        <p style="font-size:12px;color:var(--yellow)">
-            Le bot achetera au prix du marche sur l'exchange source.<br>
-            Vous devrez ensuite transferer manuellement vers l'exchange de vente.
-        </p>
-        <div class="modal-actions">
+        <div id="modal-mode-badge" style="margin-bottom:12px;"></div>
+        <div id="modal-result" style="display:none;margin-bottom:12px;"></div>
+        <div class="modal-actions" id="modal-actions">
             <button class="btn btn-cancel" onclick="closeModal()">Annuler</button>
-            <button class="btn btn-buy" id="modal-confirm" onclick="confirmBuy()">Confirmer BUY</button>
+            <button class="btn btn-scan" id="modal-confirm" onclick="executeArbitrage()">EXECUTE ARBITRAGE</button>
         </div>
     </div>
 </div>
 
 <script>
 let currentOpp = null;
+let execState = { mode: 'paper', max_trade_usdt: 100 };
+
+// Load exec state on page load
+fetch('/api/arbitrage/exec-state').then(r=>r.json()).then(d => { execState = d; }).catch(()=>{});
 
 function fmt(n, decimals) {
     if (n >= 1) return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -541,15 +549,35 @@ async function stopAutoScan() {
 
 function openBuyModal(opp) {
     currentOpp = opp;
-    document.getElementById('modal-title').textContent = `Acheter ${opp.symbol}`;
+    document.getElementById('modal-title').textContent = `Executer Arbitrage: ${opp.symbol}`;
     document.getElementById('modal-desc').textContent =
-        `Acheter sur ${opp.buy_exchange.toUpperCase()} au prix le plus bas, puis transférer vers ${opp.sell_exchange.toUpperCase()} pour vendre.`;
+        `Achat simultane sur ${opp.buy_exchange.toUpperCase()} + vente sur ${opp.sell_exchange.toUpperCase()}`;
+
+    const tradeUsdt = execState.max_trade_usdt || 100;
+    const amount = tradeUsdt / opp.buy_price;
+    const estimatedProfit = (opp.spread_pct / 100) * tradeUsdt;
+
     document.getElementById('modal-detail').innerHTML = `
         <div><span>Token</span><strong>${opp.symbol}</strong></div>
-        <div><span>Achat sur</span><strong style="color:var(--green)">${opp.buy_exchange.toUpperCase()} @ ${fmt(opp.buy_price)}</strong></div>
-        <div><span>Vente sur</span><strong style="color:var(--red)">${opp.sell_exchange.toUpperCase()} @ ${fmt(opp.sell_price)}</strong></div>
+        <div><span>BUY</span><strong style="color:var(--green)">${opp.buy_exchange.toUpperCase()} @ ${fmt(opp.buy_price)}</strong></div>
+        <div><span>SELL</span><strong style="color:var(--red)">${opp.sell_exchange.toUpperCase()} @ ${fmt(opp.sell_price)}</strong></div>
         <div><span>Spread</span><strong style="color:${spreadColor(opp.spread_pct)}">${opp.spread_pct.toFixed(3)}%</strong></div>
+        <div><span>Montant</span><strong>$${tradeUsdt} (${amount.toFixed(4)} tokens)</strong></div>
+        <div><span>Profit estime</span><strong style="color:var(--green)">~$${estimatedProfit.toFixed(4)}</strong></div>
     `;
+
+    const modeBadge = execState.mode === 'paper'
+        ? '<span style="background:rgba(16,185,129,0.15);color:var(--green);padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600">PAPER MODE (simulation)</span>'
+        : '<span style="background:rgba(239,68,68,0.15);color:var(--red);padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600">LIVE MODE (argent reel!)</span>';
+    document.getElementById('modal-mode-badge').innerHTML = modeBadge;
+
+    // Reset result area
+    document.getElementById('modal-result').style.display = 'none';
+    document.getElementById('modal-result').innerHTML = '';
+    document.getElementById('modal-actions').style.display = 'flex';
+    document.getElementById('modal-confirm').disabled = false;
+    document.getElementById('modal-confirm').textContent = 'EXECUTE ARBITRAGE';
+
     document.getElementById('buy-modal').classList.add('active');
 }
 
@@ -558,17 +586,108 @@ function closeModal() {
     currentOpp = null;
 }
 
-function confirmBuy() {
+async function executeArbitrage() {
     if (!currentOpp) return;
-    // For now, show alert - in production this would trigger the exchange API
-    alert(
-        `ORDRE ENVOYE (simulation)\n\n` +
-        `BUY ${currentOpp.symbol} sur ${currentOpp.buy_exchange.toUpperCase()}\n` +
-        `Prix: ${fmt(currentOpp.buy_price)}\n\n` +
-        `Prochaine etape: Transferez manuellement vers ${currentOpp.sell_exchange.toUpperCase()} pour vendre a ${fmt(currentOpp.sell_price)}`
-    );
-    closeModal();
+
+    const btn = document.getElementById('modal-confirm');
+    btn.disabled = true;
+    btn.textContent = 'Execution en cours...';
+
+    try {
+        const res = await fetch('/api/arbitrage/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbol: currentOpp.symbol,
+                buy_exchange: currentOpp.buy_exchange,
+                buy_price: currentOpp.buy_price,
+                sell_exchange: currentOpp.sell_exchange,
+                sell_price: currentOpp.sell_price,
+                spread_pct: currentOpp.spread_pct,
+            }),
+        });
+
+        const data = await res.json();
+        const exec = data.execution;
+
+        // Show result
+        const resultDiv = document.getElementById('modal-result');
+        resultDiv.style.display = 'block';
+
+        const statusColor = exec.status === 'success' ? 'var(--green)' : exec.status === 'partial' ? 'var(--yellow)' : 'var(--red)';
+        const statusLabel = exec.status === 'success' ? 'SUCCES' : exec.status === 'partial' ? 'PARTIEL' : 'ECHEC';
+
+        resultDiv.innerHTML = `
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;font-size:13px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                    <strong>Resultat</strong>
+                    <span style="color:${statusColor};font-weight:700">${statusLabel} ${exec.paper_mode ? '(paper)' : '(LIVE)'}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:3px 0;">
+                    <span>BUY ${exec.buy_leg.exchange}</span>
+                    <span style="color:var(--green)">${exec.buy_leg.status === 'paper_filled' || exec.buy_leg.status === 'filled' ? fmt(exec.buy_leg.filled_price) : 'ECHEC: ' + exec.buy_leg.error}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:3px 0;">
+                    <span>SELL ${exec.sell_leg.exchange}</span>
+                    <span style="color:var(--red)">${exec.sell_leg.status === 'paper_filled' || exec.sell_leg.status === 'filled' ? fmt(exec.sell_leg.filled_price) : 'ECHEC: ' + exec.sell_leg.error}</span>
+                </div>
+                <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;">
+                    <span>Spread reel</span>
+                    <strong style="color:${spreadColor(exec.actual_spread_pct)}">${exec.actual_spread_pct.toFixed(3)}%</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:3px 0;">
+                    <span>Profit</span>
+                    <strong style="color:${exec.net_profit_usdt >= 0 ? 'var(--green)' : 'var(--red)'}">$${exec.net_profit_usdt.toFixed(4)}</strong>
+                </div>
+            </div>
+        `;
+
+        // Replace actions with just close button
+        document.getElementById('modal-actions').innerHTML = '<button class="btn btn-cancel" onclick="closeModal()" style="flex:1">Fermer</button>';
+
+        // Refresh execution history
+        loadExecutionHistory();
+
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'EXECUTE ARBITRAGE';
+        document.getElementById('modal-result').style.display = 'block';
+        document.getElementById('modal-result').innerHTML = `<div class="error-box">Erreur: ${e.message}</div>`;
+    }
 }
+
+async function loadExecutionHistory() {
+    try {
+        const res = await fetch('/api/arbitrage/executions');
+        const data = await res.json();
+
+        if (!data.executions || data.executions.length === 0) return;
+
+        const container = document.getElementById('exec-history');
+        const list = document.getElementById('exec-history-list');
+        container.style.display = 'block';
+
+        list.innerHTML = data.executions.slice(0, 10).map(exec => {
+            const statusColor = exec.status === 'success' ? 'var(--green)' : exec.status === 'partial' ? 'var(--yellow)' : 'var(--red)';
+            const modeTag = exec.paper_mode ? 'PAPER' : 'LIVE';
+            return `
+                <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+                    <span style="font-weight:700;width:80px">${exec.symbol.replace('/USDT','')}</span>
+                    <span style="color:var(--green)">${exec.buy_leg.exchange} ${fmt(exec.buy_leg.filled_price)}</span>
+                    <span style="color:var(--text-dim)">&#10132;</span>
+                    <span style="color:var(--red)">${exec.sell_leg.exchange} ${fmt(exec.sell_leg.filled_price)}</span>
+                    <span style="color:${statusColor};font-weight:600">${exec.actual_spread_pct.toFixed(3)}%</span>
+                    <span style="color:${exec.net_profit_usdt >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:600">$${exec.net_profit_usdt.toFixed(4)}</span>
+                    <span style="color:var(--text-dim)">${modeTag}</span>
+                    <span style="color:var(--text-dim)">${fmtTime(exec.executed_at)}</span>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {}
+}
+
+// Load history on page load
+loadExecutionHistory();
 
 function renderCards(opps) {
     const container = document.getElementById('cards-container');
@@ -643,11 +762,8 @@ function renderCards(opps) {
             ${indicatorsHtml}
             <div class="arb-exchanges">${chips}</div>
             <div class="arb-actions">
-                <button class="btn-buy" onclick='openBuyModal(${JSON.stringify(opp)})'>
-                    BUY on ${opp.buy_exchange.toUpperCase()}
-                </button>
-                <button class="btn-sell btn-disabled" disabled title="Transferez d'abord depuis ${opp.buy_exchange}">
-                    SELL on ${opp.sell_exchange.toUpperCase()}
+                <button class="btn-buy" style="flex:1;background:var(--orange)" onclick='openBuyModal(${JSON.stringify(opp)})'>
+                    EXECUTE: ${opp.buy_exchange.toUpperCase()} &#10132; ${opp.sell_exchange.toUpperCase()}
                 </button>
             </div>
         </div>

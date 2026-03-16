@@ -24,11 +24,13 @@ import time
 import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
 
 from src.exchange.client import ExchangeClient
+from src.exchange.client_pool import MultiExchangeClientPool
 from src.exchange.multi_exchange import MultiExchangeScanner
+from src.execution.arb_executor import ArbitrageExecutor
 from src.data.fetcher import DataFetcher
 from src.indicators.technical import add_all_indicators
 from src.strategies.base import Signal
@@ -83,6 +85,8 @@ bot_components = {}
 bot_thread = None
 arb_scanner = None
 arb_thread = None
+arb_executor = None
+arb_client_pool = None
 
 
 def load_config():
@@ -494,6 +498,93 @@ def scan_once():
     arb_thread = threading.Thread(target=_scan_once_worker, daemon=True)
     arb_thread.start()
     return jsonify({"status": "started"})
+
+
+# ─── Arbitrage Execution Routes ──────────────────────
+
+def _init_arb_executor():
+    """Initialise l'exécuteur d'arbitrage (lazy, au premier appel)."""
+    global arb_executor, arb_client_pool
+    if arb_executor is not None:
+        return
+
+    settings, _ = load_config()
+    arb_config = settings.get("arbitrage", {})
+    exchanges_config = settings.get("exchanges", [])
+
+    arb_client_pool = MultiExchangeClientPool(exchanges_config)
+    arb_executor = ArbitrageExecutor(arb_client_pool, arb_config)
+
+
+@app.route("/api/arbitrage/exec-state")
+def get_arb_exec_state():
+    """Retourne l'état de l'exécuteur (mode, exchanges configurés)."""
+    _init_arb_executor()
+    settings, _ = load_config()
+    arb_config = settings.get("arbitrage", {})
+    return jsonify({
+        "mode": "paper" if arb_executor.paper_mode else "live",
+        "live_confirmed": arb_executor.live_confirmed,
+        "configured_exchanges": arb_client_pool.get_configured_exchanges(),
+        "max_trade_usdt": arb_config.get("max_trade_usdt", 100),
+        "min_spread_pct": arb_config.get("min_spread_pct", 0.3),
+    })
+
+
+@app.route("/api/arbitrage/execute", methods=["POST"])
+def execute_arbitrage():
+    """Exécute un trade d'arbitrage simultané."""
+    _init_arb_executor()
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "error", "error": "No data provided"}), 400
+
+    symbol = data.get("symbol")
+    buy_exchange = data.get("buy_exchange")
+    buy_price = data.get("buy_price", 0)
+    sell_exchange = data.get("sell_exchange")
+    sell_price = data.get("sell_price", 0)
+    spread_pct = data.get("spread_pct", 0)
+
+    if not all([symbol, buy_exchange, sell_exchange]):
+        return jsonify({"status": "error", "error": "Missing fields"}), 400
+
+    # Exécution (rapide en paper, un peu plus lent en live)
+    result = arb_executor.execute(
+        symbol=symbol,
+        buy_exchange=buy_exchange,
+        buy_price=float(buy_price),
+        sell_exchange=sell_exchange,
+        sell_price=float(sell_price),
+        spread_pct=float(spread_pct),
+    )
+
+    return jsonify({"status": "ok", "execution": result.to_dict()})
+
+
+@app.route("/api/arbitrage/executions")
+def get_executions():
+    """Retourne l'historique des exécutions."""
+    _init_arb_executor()
+    return jsonify({
+        "executions": [r.to_dict() for r in reversed(arb_executor.execution_history[-50:])]
+    })
+
+
+@app.route("/api/arbitrage/confirm-live", methods=["POST"])
+def confirm_live_mode():
+    """Confirme le passage en mode live (nécessite 'OUI JE CONFIRME')."""
+    _init_arb_executor()
+    data = request.get_json() or {}
+    confirmation = data.get("confirmation", "")
+
+    if confirmation == "OUI JE CONFIRME":
+        arb_executor.live_confirmed = True
+        arb_executor.paper_mode = False
+        return jsonify({"status": "ok", "mode": "live"})
+    else:
+        return jsonify({"status": "error", "error": "Confirmation incorrecte"}), 403
 
 
 if __name__ == "__main__":

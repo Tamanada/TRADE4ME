@@ -22,3 +22,19 @@ risk:
 bot:
   loop_interval_sec: 10  # Intervalle entre chaque cycle (secondes)
   log_level: INFO         # DEBUG, INFO, WARNING, ERROR
+
+# ── Arbitrage Multi-Exchange ──
+# Clés API configurées dans .env (BINANCE_API_KEY, BYBIT_API_KEY, etc.)
+exchanges:
+  - name: binance
+    sandbox: true
+  - name: bybit
+    sandbox: true
+  - name: kucoin
+    sandbox: true
+
+arbitrage:
+  mode: paper            # paper | live (paper = simulation, TOUJOURS par défaut)
+  max_trade_usdt: 100    # Montant max en USDT par exécution d'arbitrage
+  min_spread_pct: 0.3    # Spread minimum requis pour exécuter (%)
+  max_slippage_pct: 0.5  # Annuler si le prix a bougé de plus de X% depuis le scan
