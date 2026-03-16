@@ -5,6 +5,7 @@ Détecte les opportunités d'arbitrage.
 
 import ccxt
 import logging
+import statistics
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
@@ -180,6 +181,48 @@ class MultiExchangeScanner:
         except Exception:
             return None
 
+    @staticmethod
+    def _filter_outlier_prices(prices: list["ExchangePrice"]) -> list["ExchangePrice"]:
+        """
+        Filtre les prix aberrants (faux positifs).
+        Un même ticker (ex: S/USDT) peut correspondre à des tokens différents
+        sur différents exchanges. On détecte ça via l'écart au prix médian.
+        """
+        if len(prices) < 3:
+            return prices
+
+        # Calcul du prix médian (basé sur 'last')
+        last_prices = [p.last for p in prices if p.last > 0]
+        if len(last_prices) < 2:
+            return prices
+
+        median_price = statistics.median(last_prices)
+        if median_price <= 0:
+            return prices
+
+        # Garder seulement les prix dans un facteur 3x du médian
+        # (un vrai arbitrage ne dépasse quasi jamais 5-10%, donc 3x = très généreux)
+        filtered = []
+        for p in prices:
+            ratio = p.last / median_price if median_price > 0 else 1
+            if 0.33 <= ratio <= 3.0:
+                filtered.append(p)
+            else:
+                logger.debug(
+                    f"Prix aberrant filtré: {p.symbol} sur {p.exchange} "
+                    f"(last={p.last}, médian={median_price}, ratio={ratio:.1f}x)"
+                )
+
+        return filtered
+
+    @staticmethod
+    def _filter_low_volume(prices: list["ExchangePrice"], min_volume_usd: float = 1000) -> list["ExchangePrice"]:
+        """
+        Filtre les prix avec un volume 24h trop faible.
+        Un spread élevé sur un exchange sans volume = pas exploitable.
+        """
+        return [p for p in prices if p.volume_24h >= min_volume_usd]
+
     def scan_token(self, symbol: str) -> ArbitrageOpportunity | None:
         """Scanne un token sur tous les exchanges et retourne l'opportunité d'arbitrage."""
         prices: list[ExchangePrice] = []
@@ -212,11 +255,34 @@ class MultiExchangeScanner:
         if len(prices) < 2:
             return None
 
+        # ── Anti faux-positifs ──
+        # 1. Filtrer les prix aberrants (même ticker = tokens différents)
+        prices = self._filter_outlier_prices(prices)
+        if len(prices) < 2:
+            return None
+
+        # 2. Filtrer le volume trop faible (spread non exploitable)
+        prices_with_volume = self._filter_low_volume(prices, min_volume_usd=1000)
+        # On garde les prix sans volume seulement si tous ont du volume filtré
+        if len(prices_with_volume) >= 2:
+            prices = prices_with_volume
+
+        if len(prices) < 2:
+            return None
+
         best_buy = min(prices, key=lambda p: p.ask)
         best_sell = max(prices, key=lambda p: p.bid)
 
         spread = best_sell.bid - best_buy.ask
         spread_pct = (spread / best_buy.ask * 100) if best_buy.ask > 0 else 0
+
+        # Ignorer les spreads négatifs ou aberrants (> 50% = suspect)
+        if spread_pct > 50:
+            logger.debug(
+                f"Spread suspect ignoré: {symbol} {spread_pct:.1f}% "
+                f"({best_buy.exchange} → {best_sell.exchange})"
+            )
+            return None
 
         all_prices_data = [
             {
