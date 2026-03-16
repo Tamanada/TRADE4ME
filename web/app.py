@@ -22,6 +22,7 @@ import json
 import threading
 import time
 import yaml
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from flask import Flask, render_template, jsonify
 from dotenv import load_dotenv
@@ -71,6 +72,10 @@ arb_state = {
     "opportunities": [],
     "last_scan": None,
     "error": None,
+    "total_tokens": 0,
+    "total_exchanges": 0,
+    "scanned_count": 0,
+    "scan_progress": "",
 }
 
 # Bot components (initialized on start)
@@ -350,20 +355,47 @@ def _arb_scan_loop():
     global arb_scanner
     if arb_scanner is None:
         arb_scanner = MultiExchangeScanner()
+        arb_state["scan_progress"] = "Decouverte des tokens..."
         arb_scanner.discover_tokens(min_exchanges=3)
         arb_state["total_tokens"] = len(arb_scanner.get_token_list())
         arb_state["total_exchanges"] = len(arb_scanner.exchanges)
 
     while arb_state["scanning"]:
         try:
-            results = arb_scanner.scan_all()
-            arb_state["opportunities"] = _format_results(results)
+            tokens = arb_scanner.get_token_list()
+            all_results = []
+            batch_size = 10
+
+            for i in range(0, len(tokens), batch_size):
+                if not arb_state["scanning"]:
+                    break
+                batch = tokens[i:i + batch_size]
+                arb_state["scanned_count"] = min(i + batch_size, len(tokens))
+                arb_state["scan_progress"] = f"Scan {arb_state['scanned_count']}/{len(tokens)} tokens..."
+
+                with ThreadPoolExecutor(max_workers=batch_size) as executor:
+                    futures = {
+                        executor.submit(arb_scanner.scan_token, symbol): symbol
+                        for symbol in batch
+                    }
+                    for future in as_completed(futures, timeout=60):
+                        try:
+                            result = future.result(timeout=15)
+                            if result:
+                                all_results.append(result)
+                        except Exception:
+                            pass
+
+                all_results.sort(key=lambda r: r.spread_pct, reverse=True)
+                arb_state["opportunities"] = _format_results(all_results)
+
             arb_state["last_scan"] = datetime.now(timezone.utc).isoformat()
             arb_state["error"] = None
+            arb_state["scan_progress"] = ""
         except Exception as e:
             arb_state["error"] = str(e)
 
-        time.sleep(60)  # Scan every 60 seconds (more tokens = more time)
+        time.sleep(60)  # Wait before next scan cycle
 
 
 @app.route("/api/arbitrage/start", methods=["POST"])
@@ -390,28 +422,74 @@ def get_arb_state():
     return jsonify(arb_state)
 
 
-@app.route("/api/arbitrage/scan-once", methods=["POST"])
-def scan_once():
-    """Single scan - discovers tokens first, then scans."""
+def _scan_once_worker():
+    """Background worker for single scan."""
     global arb_scanner
-    if arb_scanner is None:
-        arb_scanner = MultiExchangeScanner()
+    try:
+        if arb_scanner is None:
+            arb_scanner = MultiExchangeScanner()
 
-    # Discover tokens if not yet done
-    if not arb_scanner._discovered_tokens and arb_scanner.tokens is None:
-        arb_scanner.discover_tokens(min_exchanges=3)
+        # Discover tokens if not yet done
+        if not arb_scanner._discovered_tokens and arb_scanner.tokens is None:
+            arb_state["scan_progress"] = "Decouverte des tokens..."
+            arb_scanner.discover_tokens(min_exchanges=3)
+
         arb_state["total_tokens"] = len(arb_scanner.get_token_list())
         arb_state["total_exchanges"] = len(arb_scanner.exchanges)
 
-    try:
-        results = arb_scanner.scan_all()
-        arb_state["opportunities"] = _format_results(results)
+        # Scan with progressive updates
+        tokens = arb_scanner.get_token_list()
+        all_results = []
+        batch_size = 10
+
+        for i in range(0, len(tokens), batch_size):
+            if not arb_state["scanning"]:
+                break  # Allow stopping mid-scan
+
+            batch = tokens[i:i + batch_size]
+            arb_state["scanned_count"] = min(i + batch_size, len(tokens))
+            arb_state["scan_progress"] = f"Scan {arb_state['scanned_count']}/{len(tokens)} tokens..."
+
+            with ThreadPoolExecutor(max_workers=batch_size) as executor:
+                futures = {
+                    executor.submit(arb_scanner.scan_token, symbol): symbol
+                    for symbol in batch
+                }
+                for future in as_completed(futures, timeout=60):
+                    try:
+                        result = future.result(timeout=15)
+                        if result:
+                            all_results.append(result)
+                    except Exception:
+                        pass
+
+            # Update results progressively after each batch
+            all_results.sort(key=lambda r: r.spread_pct, reverse=True)
+            arb_state["opportunities"] = _format_results(all_results)
+
         arb_state["last_scan"] = datetime.now(timezone.utc).isoformat()
         arb_state["error"] = None
-        return jsonify({"status": "ok", "count": len(results)})
+        arb_state["scan_progress"] = ""
     except Exception as e:
         arb_state["error"] = str(e)
-        return jsonify({"status": "error", "error": str(e)})
+    finally:
+        arb_state["scanning"] = False
+
+
+@app.route("/api/arbitrage/scan-once", methods=["POST"])
+def scan_once():
+    """Single scan - runs in background thread, returns immediately."""
+    global arb_thread
+    if arb_state["scanning"]:
+        return jsonify({"status": "already_scanning"})
+
+    arb_state["scanning"] = True
+    arb_state["error"] = None
+    arb_state["scanned_count"] = 0
+    arb_state["scan_progress"] = "Initialisation..."
+    arb_thread = threading.Thread(target=_scan_once_worker, daemon=True)
+    arb_thread.start()
+    return jsonify({"status": "started"})
 
 
 if __name__ == "__main__":

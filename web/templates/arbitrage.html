@@ -487,15 +487,12 @@ async function scanOnce() {
     const btn = document.getElementById('btn-scan-once');
     btn.disabled = true;
     btn.textContent = 'Scanning...';
-    document.getElementById('scan-info').innerHTML = '<span class="pulse"></span>Scan en cours sur 9 exchanges...';
+    document.getElementById('scan-info').innerHTML = '<span class="pulse"></span>Scan en cours sur 20 exchanges...';
 
     try {
         await fetch('/api/arbitrage/scan-once', { method: 'POST' });
     } catch (e) {}
-
-    btn.disabled = false;
-    btn.textContent = 'Scan Now';
-    pollArbitrage();
+    // Don't re-enable button here - pollArbitrage will handle it when scanning finishes
 }
 
 async function startAutoScan() {
@@ -609,14 +606,17 @@ async function pollArbitrage() {
 
         // Status badge
         const badge = document.getElementById('scan-badge');
+        const btn = document.getElementById('btn-scan-once');
         if (data.scanning) {
             badge.textContent = 'SCANNING';
             badge.className = 'badge badge-scanning';
-            document.getElementById('btn-auto-start').style.display = 'none';
-            document.getElementById('btn-auto-stop').style.display = '';
+            btn.disabled = true;
+            btn.textContent = 'Scanning...';
         } else {
             badge.textContent = 'IDLE';
             badge.className = 'badge badge-idle';
+            btn.disabled = false;
+            btn.textContent = 'Scan Now';
         }
 
         // Stats bar
@@ -624,15 +624,19 @@ async function pollArbitrage() {
             const statsBar = document.getElementById('stats-bar');
             statsBar.style.display = 'flex';
             document.getElementById('stat-exchanges').textContent = data.total_exchanges || 0;
-            document.getElementById('stat-tokens').textContent = data.total_tokens || data.opportunities.length;
+            document.getElementById('stat-tokens').textContent = data.total_tokens || 0;
         }
 
-        // Info
-        if (data.scanning) {
-            document.getElementById('scan-info').innerHTML = '<span class="pulse"></span>Auto-scan actif (toutes les 60s) - Top 10 affiches';
+        // Info - show scan progress
+        if (data.scanning && data.scan_progress) {
+            document.getElementById('scan-info').innerHTML =
+                `<span class="pulse"></span>${data.scan_progress} (${data.total_exchanges} exchanges)`;
+        } else if (data.scanning) {
+            document.getElementById('scan-info').innerHTML =
+                '<span class="pulse"></span>Scan en cours sur 20 exchanges...';
         } else if (data.opportunities.length > 0) {
             document.getElementById('scan-info').textContent =
-                `${data.opportunities.length} tokens scannes - Top 10 affiches`;
+                `${data.total_tokens || data.opportunities.length} tokens scannes sur ${data.total_exchanges || 20} exchanges - Top 10 affiches`;
         }
 
         if (data.last_scan) {
@@ -648,7 +652,7 @@ async function pollArbitrage() {
             errBox.style.display = 'none';
         }
 
-        // Render cards sorted by spread % (already sorted server-side)
+        // Render cards sorted by spread % (already sorted server-side, updated progressively)
         if (data.opportunities.length > 0) {
             renderCards(data.opportunities);
         }
