@@ -250,6 +250,38 @@
         .exchange-chip.cheapest { background: rgba(16,185,129,0.12); color: var(--green); }
         .exchange-chip.expensive { background: rgba(239,68,68,0.12); color: var(--red); }
 
+        /* Indicators row */
+        .arb-indicators {
+            padding: 8px 20px 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .indicator-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+        }
+
+        .indicator-badge .label {
+            color: var(--text-dim);
+            font-weight: 400;
+        }
+
+        .rsi-oversold { color: var(--green); border-color: rgba(16,185,129,0.3); }
+        .rsi-overbought { color: var(--red); border-color: rgba(239,68,68,0.3); }
+        .rsi-neutral { color: var(--text-dim); }
+
+        .trend-bullish { color: var(--green); border-color: rgba(16,185,129,0.3); }
+        .trend-bearish { color: var(--red); border-color: rgba(239,68,68,0.3); }
+
         /* Action buttons */
         .arb-actions {
             padding: 12px 20px;
@@ -563,6 +595,29 @@ function renderCards(opps) {
             return `<span class="${cls}">${p.exchange} ${fmt(p.ask, priceDecimals)}</span>`;
         }).join('');
 
+        // RSI badge
+        let rsiBadge = '';
+        if (opp.rsi != null) {
+            let rsiClass = 'rsi-neutral';
+            let rsiLabel = 'Neutre';
+            if (opp.rsi <= 30) { rsiClass = 'rsi-oversold'; rsiLabel = 'Survendu'; }
+            else if (opp.rsi >= 70) { rsiClass = 'rsi-overbought'; rsiLabel = 'Surachet\u00e9'; }
+            rsiBadge = `<span class="indicator-badge ${rsiClass}"><span class="label">RSI</span> ${opp.rsi.toFixed(1)} ${rsiLabel}</span>`;
+        }
+
+        // EMA trend badge
+        let trendBadge = '';
+        if (opp.ema_trend) {
+            const trendClass = opp.ema_trend === 'BULLISH' ? 'trend-bullish' : 'trend-bearish';
+            const trendIcon = opp.ema_trend === 'BULLISH' ? '\u25B2' : '\u25BC';
+            const trendLabel = opp.ema_trend === 'BULLISH' ? 'Haussier' : 'Baissier';
+            trendBadge = `<span class="indicator-badge ${trendClass}"><span class="label">EMA 9/21</span> ${trendIcon} ${trendLabel}</span>`;
+        }
+
+        const indicatorsHtml = (rsiBadge || trendBadge)
+            ? `<div class="arb-indicators">${rsiBadge}${trendBadge}</div>`
+            : '';
+
         return `
         <div class="arb-card">
             <div class="spread-bar">
@@ -585,6 +640,7 @@ function renderCards(opps) {
                     <div class="price">${fmt(opp.sell_price, priceDecimals)}</div>
                 </div>
             </div>
+            ${indicatorsHtml}
             <div class="arb-exchanges">${chips}</div>
             <div class="arb-actions">
                 <button class="btn-buy" onclick='openBuyModal(${JSON.stringify(opp)})'>

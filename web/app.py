@@ -345,6 +345,10 @@ def _format_results(results):
             "spread_pct": round(r.spread_pct, 3),
             "all_prices": r.all_prices,
             "num_exchanges": r.num_exchanges,
+            "rsi": r.rsi,
+            "ema_trend": r.ema_trend,
+            "ema_9": r.ema_9,
+            "ema_21": r.ema_21,
         }
         for r in results
     ]

@@ -6,8 +6,9 @@ Détecte les opportunités d'arbitrage.
 import ccxt
 import logging
 import statistics
+import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 logger = logging.getLogger("trade4me")
 
@@ -58,6 +59,11 @@ class ArbitrageOpportunity:
     spread_pct: float
     all_prices: list
     num_exchanges: int = 0  # Nombre d'exchanges où le token est listé
+    # Indicateurs techniques (RSI + EMA trend)
+    rsi: float | None = None
+    ema_trend: str = ""  # "BULLISH", "BEARISH", or ""
+    ema_9: float | None = None
+    ema_21: float | None = None
 
 
 class MultiExchangeScanner:
@@ -223,6 +229,50 @@ class MultiExchangeScanner:
         """
         return [p for p in prices if p.volume_24h >= min_volume_usd]
 
+    def _fetch_indicators(self, exchange_name: str, symbol: str) -> dict:
+        """
+        Récupère RSI(14) + EMA 9/21 pour un token sur un exchange.
+        Utilise les candles 1h (50 dernières) pour avoir assez de données.
+        """
+        try:
+            ex = self.exchanges.get(exchange_name)
+            if not ex or not ex.has.get("fetchOHLCV", False):
+                return {}
+
+            ohlcv = ex.fetch_ohlcv(symbol, timeframe="1h", limit=50)
+            if not ohlcv or len(ohlcv) < 21:
+                return {}
+
+            df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
+
+            # RSI(14)
+            import ta as ta_lib
+            rsi_val = ta_lib.momentum.rsi(df["close"], window=14)
+            rsi = round(float(rsi_val.iloc[-1]), 1) if not rsi_val.iloc[-1] != rsi_val.iloc[-1] else None
+
+            # EMA 9 & 21
+            ema_9 = ta_lib.trend.ema_indicator(df["close"], window=9)
+            ema_21 = ta_lib.trend.ema_indicator(df["close"], window=21)
+
+            ema_9_val = float(ema_9.iloc[-1])
+            ema_21_val = float(ema_21.iloc[-1])
+
+            # Trend direction
+            if ema_9_val > ema_21_val:
+                trend = "BULLISH"
+            else:
+                trend = "BEARISH"
+
+            return {
+                "rsi": rsi,
+                "ema_trend": trend,
+                "ema_9": round(ema_9_val, 8),
+                "ema_21": round(ema_21_val, 8),
+            }
+        except Exception as e:
+            logger.debug(f"Indicateurs non disponibles pour {symbol} sur {exchange_name}: {e}")
+            return {}
+
     def scan_token(self, symbol: str) -> ArbitrageOpportunity | None:
         """Scanne un token sur tous les exchanges et retourne l'opportunité d'arbitrage."""
         prices: list[ExchangePrice] = []
@@ -295,6 +345,10 @@ class MultiExchangeScanner:
             for p in sorted(prices, key=lambda p: p.ask)
         ]
 
+        # ── Indicateurs techniques (RSI + EMA trend) ──
+        # On fetch sur l'exchange d'achat (le plus pertinent pour décider)
+        indicators = self._fetch_indicators(best_buy.exchange, symbol)
+
         return ArbitrageOpportunity(
             symbol=symbol,
             buy_exchange=best_buy.exchange,
@@ -305,6 +359,10 @@ class MultiExchangeScanner:
             spread_pct=spread_pct,
             all_prices=all_prices_data,
             num_exchanges=len(prices),
+            rsi=indicators.get("rsi"),
+            ema_trend=indicators.get("ema_trend", ""),
+            ema_9=indicators.get("ema_9"),
+            ema_21=indicators.get("ema_21"),
         )
 
     def scan_all(self, max_tokens: int = 0) -> list[ArbitrageOpportunity]:
