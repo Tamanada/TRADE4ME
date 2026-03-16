@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRADE4ME - Arbitrage Scanner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0e17;
+            --card: #111827;
+            --border: #1f2937;
+            --text: #e5e7eb;
+            --text-dim: #9ca3af;
+            --green: #10b981;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --yellow: #f59e0b;
+            --purple: #8b5cf6;
+            --orange: #f97316;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .header h1 span {
+            background: linear-gradient(135deg, var(--orange), var(--yellow));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-link {
+            color: var(--text-dim);
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .nav-link:hover { background: var(--border); color: var(--text); }
+
+        .badge {
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-scanning { background: rgba(16,185,129,0.15); color: var(--green); }
+        .badge-idle { background: rgba(156,163,175,0.15); color: var(--text-dim); }
+
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-scan { background: var(--orange); color: #fff; }
+        .btn-scan:hover { background: #ea580c; }
+        .btn-start { background: var(--green); color: #fff; }
+        .btn-start:hover { background: #059669; }
+        .btn-stop { background: var(--red); color: #fff; }
+        .btn-stop:hover { background: #dc2626; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-small {
+            padding: 6px 14px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+
+        /* Info Bar */
+        .info-bar {
+            padding: 12px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            background: var(--card);
+        }
+
+        .info-bar .info {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .pulse {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--green);
+            border-radius: 50%;
+            margin-right: 6px;
+            animation: pulse-anim 2s infinite;
+        }
+
+        @keyframes pulse-anim {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Main */
+        .main {
+            padding: 24px 32px;
+        }
+
+        /* Token Cards Grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 16px;
+        }
+
+        /* Token Arbitrage Card */
+        .arb-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 0;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .arb-card:hover {
+            border-color: var(--blue);
+            transform: translateY(-2px);
+        }
+
+        /* Card Header - Token name + spread */
+        .arb-card-header {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .token-name {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .spread-badge {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .spread-positive {
+            background: rgba(16,185,129,0.15);
+            color: var(--green);
+        }
+
+        .spread-negative {
+            background: rgba(239,68,68,0.15);
+            color: var(--red);
+        }
+
+        /* Buy/Sell row */
+        .arb-trade-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            padding: 16px 20px;
+            gap: 12px;
+        }
+
+        .trade-side {
+            text-align: center;
+        }
+
+        .trade-side .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .trade-side .exchange-name {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .trade-side .price {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        .buy-side .label { color: var(--green); }
+        .buy-side .price { color: var(--green); }
+        .sell-side .label { color: var(--red); }
+        .sell-side .price { color: var(--red); }
+
+        .arrow-divider {
+            font-size: 24px;
+            color: var(--text-dim);
+        }
+
+        /* All exchanges row */
+        .arb-exchanges {
+            padding: 0 20px 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .exchange-chip {
+            padding: 3px 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .exchange-chip.cheapest { background: rgba(16,185,129,0.12); color: var(--green); }
+        .exchange-chip.expensive { background: rgba(239,68,68,0.12); color: var(--red); }
+
+        /* Action buttons */
+        .arb-actions {
+            padding: 12px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-buy {
+            flex: 1;
+            background: var(--green);
+            color: #fff;
+            font-weight: 700;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn-buy:hover { background: #059669; }
+
+        .btn-sell {
+            flex: 1;
+            background: var(--red);
+            color: #fff;
+            font-weight: 700;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn-sell:hover { background: #dc2626; }
+
+        .btn-disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Spread indicator bar */
+        .spread-bar {
+            height: 3px;
+            background: var(--border);
+            margin: 0;
+        }
+
+        .spread-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-dim);
+        }
+
+        .loading .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--orange);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-dim);
+        }
+
+        /* Error */
+        .error-box {
+            background: rgba(239,68,68,0.1);
+            border: 1px solid var(--red);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--red);
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+
+        /* Confirmation modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 440px;
+            width: 90%;
+        }
+
+        .modal h3 {
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+
+        .modal p {
+            font-size: 14px;
+            color: var(--text-dim);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .modal .detail {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .modal .detail div {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal-actions .btn { flex: 1; padding: 10px; }
+        .btn-cancel { background: var(--border); color: var(--text); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1><span>TRADE4ME</span> Arbitrage Scanner</h1>
+    <div class="header-right">
+        <a href="/" class="nav-link">Dashboard</a>
+        <span id="scan-badge" class="badge badge-idle">IDLE</span>
+        <button id="btn-scan-once" class="btn btn-scan" onclick="scanOnce()">Scan Now</button>
+        <button id="btn-auto-start" class="btn btn-start btn-small" onclick="startAutoScan()">Auto Scan</button>
+        <button id="btn-auto-stop" class="btn btn-stop btn-small" onclick="stopAutoScan()" style="display:none">Stop Auto</button>
+    </div>
+</div>
+
+<div class="info-bar">
+    <div class="info" id="scan-info">Appuyez sur "Scan Now" pour scanner les prix sur 20 exchanges</div>
+    <div class="info" id="last-scan"></div>
+</div>
+
+<div class="main">
+    <div id="error-box" class="error-box" style="display:none"></div>
+    <div id="stats-bar" style="margin-bottom:16px;display:none;gap:16px;flex-wrap:wrap;">
+        <span style="background:var(--card);border:1px solid var(--border);padding:8px 16px;border-radius:8px;font-size:13px;">
+            Exchanges: <strong id="stat-exchanges">0</strong>
+        </span>
+        <span style="background:var(--card);border:1px solid var(--border);padding:8px 16px;border-radius:8px;font-size:13px;">
+            Tokens scannes: <strong id="stat-tokens">0</strong>
+        </span>
+        <span style="background:var(--card);border:1px solid var(--border);padding:8px 16px;border-radius:8px;font-size:13px;">
+            Top 10 affiches: <strong style="color:var(--orange)" id="stat-displayed">0</strong>
+        </span>
+    </div>
+    <div id="cards-container" class="cards-grid">
+        <div class="empty">
+            Cliquez sur <strong>Scan Now</strong> pour decouvrir et scanner tous les tokens<br>
+            sur les 20 meilleurs exchanges mondiaux.<br><br>
+            <span style="font-size:12px;color:var(--text-dim)">
+                Binance, Bybit, OKX, Coinbase, KuCoin, Gate, Bitget, MEXC, HTX, Kraken,<br>
+                Bitfinex, Poloniex, BingX, Phemex, LBank, BitMart, AscendEX, WhiteBit, ProBit, DigiFinex
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Buy Confirmation Modal -->
+<div class="modal-overlay" id="buy-modal">
+    <div class="modal">
+        <h3 id="modal-title">Confirmer l'achat</h3>
+        <p id="modal-desc"></p>
+        <div class="detail" id="modal-detail"></div>
+        <p style="font-size:12px;color:var(--yellow)">
+            Le bot achetera au prix du marche sur l'exchange source.<br>
+            Vous devrez ensuite transferer manuellement vers l'exchange de vente.
+        </p>
+        <div class="modal-actions">
+            <button class="btn btn-cancel" onclick="closeModal()">Annuler</button>
+            <button class="btn btn-buy" id="modal-confirm" onclick="confirmBuy()">Confirmer BUY</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentOpp = null;
+
+function fmt(n, decimals) {
+    if (n >= 1) return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return '$' + Number(n).toFixed(decimals || 6);
+}
+
+function fmtTime(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function spreadColor(pct) {
+    if (pct >= 0.5) return '#10b981';
+    if (pct >= 0.1) return '#f59e0b';
+    return '#ef4444';
+}
+
+function spreadBarWidth(pct) {
+    return Math.min(100, Math.max(2, pct * 20)) + '%';
+}
+
+async function scanOnce() {
+    const btn = document.getElementById('btn-scan-once');
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    document.getElementById('scan-info').innerHTML = '<span class="pulse"></span>Scan en cours sur 9 exchanges...';
+
+    try {
+        await fetch('/api/arbitrage/scan-once', { method: 'POST' });
+    } catch (e) {}
+
+    btn.disabled = false;
+    btn.textContent = 'Scan Now';
+    pollArbitrage();
+}
+
+async function startAutoScan() {
+    await fetch('/api/arbitrage/start', { method: 'POST' });
+    document.getElementById('btn-auto-start').style.display = 'none';
+    document.getElementById('btn-auto-stop').style.display = '';
+}
+
+async function stopAutoScan() {
+    await fetch('/api/arbitrage/stop', { method: 'POST' });
+    document.getElementById('btn-auto-start').style.display = '';
+    document.getElementById('btn-auto-stop').style.display = 'none';
+}
+
+function openBuyModal(opp) {
+    currentOpp = opp;
+    document.getElementById('modal-title').textContent = `Acheter ${opp.symbol}`;
+    document.getElementById('modal-desc').textContent =
+        `Acheter sur ${opp.buy_exchange.toUpperCase()} au prix le plus bas, puis transférer vers ${opp.sell_exchange.toUpperCase()} pour vendre.`;
+    document.getElementById('modal-detail').innerHTML = `
+        <div><span>Token</span><strong>${opp.symbol}</strong></div>
+        <div><span>Achat sur</span><strong style="color:var(--green)">${opp.buy_exchange.toUpperCase()} @ ${fmt(opp.buy_price)}</strong></div>
+        <div><span>Vente sur</span><strong style="color:var(--red)">${opp.sell_exchange.toUpperCase()} @ ${fmt(opp.sell_price)}</strong></div>
+        <div><span>Spread</span><strong style="color:${spreadColor(opp.spread_pct)}">${opp.spread_pct.toFixed(3)}%</strong></div>
+    `;
+    document.getElementById('buy-modal').classList.add('active');
+}
+
+function closeModal() {
+    document.getElementById('buy-modal').classList.remove('active');
+    currentOpp = null;
+}
+
+function confirmBuy() {
+    if (!currentOpp) return;
+    // For now, show alert - in production this would trigger the exchange API
+    alert(
+        `ORDRE ENVOYE (simulation)\n\n` +
+        `BUY ${currentOpp.symbol} sur ${currentOpp.buy_exchange.toUpperCase()}\n` +
+        `Prix: ${fmt(currentOpp.buy_price)}\n\n` +
+        `Prochaine etape: Transferez manuellement vers ${currentOpp.sell_exchange.toUpperCase()} pour vendre a ${fmt(currentOpp.sell_price)}`
+    );
+    closeModal();
+}
+
+function renderCards(opps) {
+    const container = document.getElementById('cards-container');
+
+    if (!opps || opps.length === 0) {
+        container.innerHTML = '<div class="empty">Aucune opportunite trouvee. Relancez le scan.</div>';
+        return;
+    }
+
+    // Top 10 seulement
+    const top10 = opps.slice(0, 10);
+    document.getElementById('stat-displayed').textContent = top10.length;
+
+    container.innerHTML = top10.map(opp => {
+        const color = spreadColor(opp.spread_pct);
+        const badgeClass = opp.spread_pct >= 0 ? 'spread-positive' : 'spread-negative';
+        const priceDecimals = opp.buy_price >= 1 ? 2 : 6;
+
+        // Exchange chips
+        const chips = (opp.all_prices || []).map((p, i) => {
+            let cls = 'exchange-chip';
+            if (p.exchange === opp.buy_exchange) cls += ' cheapest';
+            if (p.exchange === opp.sell_exchange) cls += ' expensive';
+            return `<span class="${cls}">${p.exchange} ${fmt(p.ask, priceDecimals)}</span>`;
+        }).join('');
+
+        return `
+        <div class="arb-card">
+            <div class="spread-bar">
+                <div class="spread-bar-fill" style="width:${spreadBarWidth(opp.spread_pct)};background:${color}"></div>
+            </div>
+            <div class="arb-card-header">
+                <span class="token-name">${opp.symbol.replace('/USDT', '')} <span style="font-size:11px;color:var(--text-dim);font-weight:400">${opp.num_exchanges || ''} exchanges</span></span>
+                <span class="spread-badge ${badgeClass}">${opp.spread_pct >= 0 ? '+' : ''}${opp.spread_pct.toFixed(3)}%</span>
+            </div>
+            <div class="arb-trade-row">
+                <div class="trade-side buy-side">
+                    <div class="label">ACHETER</div>
+                    <div class="exchange-name">${opp.buy_exchange}</div>
+                    <div class="price">${fmt(opp.buy_price, priceDecimals)}</div>
+                </div>
+                <div class="arrow-divider">&#10132;</div>
+                <div class="trade-side sell-side">
+                    <div class="label">VENDRE</div>
+                    <div class="exchange-name">${opp.sell_exchange}</div>
+                    <div class="price">${fmt(opp.sell_price, priceDecimals)}</div>
+                </div>
+            </div>
+            <div class="arb-exchanges">${chips}</div>
+            <div class="arb-actions">
+                <button class="btn-buy" onclick='openBuyModal(${JSON.stringify(opp)})'>
+                    BUY on ${opp.buy_exchange.toUpperCase()}
+                </button>
+                <button class="btn-sell btn-disabled" disabled title="Transferez d'abord depuis ${opp.buy_exchange}">
+                    SELL on ${opp.sell_exchange.toUpperCase()}
+                </button>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+async function pollArbitrage() {
+    try {
+        const res = await fetch('/api/arbitrage/state');
+        const data = await res.json();
+
+        // Status badge
+        const badge = document.getElementById('scan-badge');
+        if (data.scanning) {
+            badge.textContent = 'SCANNING';
+            badge.className = 'badge badge-scanning';
+            document.getElementById('btn-auto-start').style.display = 'none';
+            document.getElementById('btn-auto-stop').style.display = '';
+        } else {
+            badge.textContent = 'IDLE';
+            badge.className = 'badge badge-idle';
+        }
+
+        // Stats bar
+        if (data.total_exchanges || data.total_tokens) {
+            const statsBar = document.getElementById('stats-bar');
+            statsBar.style.display = 'flex';
+            document.getElementById('stat-exchanges').textContent = data.total_exchanges || 0;
+            document.getElementById('stat-tokens').textContent = data.total_tokens || data.opportunities.length;
+        }
+
+        // Info
+        if (data.scanning) {
+            document.getElementById('scan-info').innerHTML = '<span class="pulse"></span>Auto-scan actif (toutes les 60s) - Top 10 affiches';
+        } else if (data.opportunities.length > 0) {
+            document.getElementById('scan-info').textContent =
+                `${data.opportunities.length} tokens scannes - Top 10 affiches`;
+        }
+
+        if (data.last_scan) {
+            document.getElementById('last-scan').textContent = 'Dernier scan: ' + fmtTime(data.last_scan);
+        }
+
+        // Error
+        const errBox = document.getElementById('error-box');
+        if (data.error) {
+            errBox.textContent = data.error;
+            errBox.style.display = '';
+        } else {
+            errBox.style.display = 'none';
+        }
+
+        // Render cards sorted by spread % (already sorted server-side)
+        if (data.opportunities.length > 0) {
+            renderCards(data.opportunities);
+        }
+    } catch (e) {}
+}
+
+setInterval(pollArbitrage, 5000);
+pollArbitrage();
+</script>
+
+</body>
+</html>
