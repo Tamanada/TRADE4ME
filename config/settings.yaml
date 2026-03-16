@@ -1,0 +1,24 @@
+# TRADE4ME - Configuration Générale
+
+exchange:
+  name: binance
+  sandbox: true  # Utiliser le testnet de l'exchange
+
+trading:
+  mode: paper  # paper | live (TOUJOURS commencer en paper!)
+  symbols:
+    - BTC/USDT
+    - ETH/USDT
+  timeframe: 1m  # 1m, 5m, 15m, 1h
+  candle_limit: 100  # Nombre de bougies à récupérer
+
+risk:
+  max_position_pct: 2.0    # Max 2% du capital par trade
+  stop_loss_pct: 1.0        # Stop-loss à 1% en dessous du prix d'entrée
+  take_profit_pct: 1.5      # Take-profit à 1.5% au dessus du prix d'entrée
+  max_drawdown_pct: 10.0    # Drawdown max avant arrêt du bot
+  max_open_positions: 3     # Nombre max de positions simultanées
+
+bot:
+  loop_interval_sec: 10  # Intervalle entre chaque cycle (secondes)
+  log_level: INFO         # DEBUG, INFO, WARNING, ERROR

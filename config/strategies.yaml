@@ -1,0 +1,27 @@
+# TRADE4ME - Configuration des Stratégies
+
+scalp_ema:
+  enabled: true
+  ema_fast: 9
+  ema_slow: 21
+  rsi_period: 14
+  rsi_oversold: 30
+  rsi_overbought: 70
+  min_volume_ratio: 1.5  # Volume actuel / volume moyen minimum
+
+scalp_rsi:
+  enabled: true
+  rsi_period: 14
+  rsi_entry: 25        # Entrée quand RSI < 25 (survente)
+  rsi_exit: 70         # Sortie quand RSI > 70 (surachat)
+  ema_trend: 50        # EMA pour confirmer la tendance
+  min_volume_ratio: 1.2
+
+scalp_momentum:
+  enabled: false
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  bb_period: 20
+  bb_std: 2.0
+  min_volume_ratio: 2.0
