@@ -46,6 +46,8 @@ class ExchangePrice:
     last: float
     volume_24h: float
     available: bool = True
+    suspended: bool = False  # Trading suspendu sur cet exchange
+    suspend_reason: str = ""  # Raison de la suspension
 
 
 @dataclass
@@ -69,6 +71,8 @@ class ArbitrageOpportunity:
     ema_trend: str = ""  # "BULLISH", "BEARISH", or ""
     ema_9: float | None = None
     ema_21: float | None = None
+    # Suspension info
+    suspended_exchanges: list = field(default_factory=list)  # [{exchange, reason}]
 
 
 class MultiExchangeScanner:
@@ -91,6 +95,7 @@ class MultiExchangeScanner:
         self.exchange_markets: dict[str, set] = {}  # Marchés par exchange
         self._discovered_tokens: list[str] = []
         self._fee_cache: dict[str, float] = {}  # exchange_name -> taker fee %
+        self._suspended_pairs: dict[str, dict[str, str]] = {}  # exchange -> {symbol: reason}
         self._init_exchanges()
 
     def _init_exchanges(self):
@@ -115,13 +120,29 @@ class MultiExchangeScanner:
             return set()
         try:
             ex.load_markets()
-            usdt_pairs = {
-                symbol for symbol in ex.markets
-                if symbol.endswith("/USDT")
-                and ex.markets[symbol].get("active", True)
-                and ex.markets[symbol].get("spot", True)
-            }
+            usdt_pairs = set()
+            suspended = {}
+
+            for symbol, market in ex.markets.items():
+                if not symbol.endswith("/USDT"):
+                    continue
+                if not market.get("spot", True):
+                    continue
+
+                # Détection de suspension de trading
+                is_active = market.get("active", True)
+                info = market.get("info", {}) or {}
+                suspend_reason = self._detect_suspension(exchange_name, info, is_active)
+
+                if suspend_reason:
+                    suspended[symbol] = suspend_reason
+                    # On inclut quand même dans les marchés pour pouvoir afficher le warning
+                    usdt_pairs.add(symbol)
+                elif is_active:
+                    usdt_pairs.add(symbol)
+
             self.exchange_markets[exchange_name] = usdt_pairs
+            self._suspended_pairs[exchange_name] = suspended
 
             # Cache les frais taker de cet exchange
             try:
@@ -137,11 +158,90 @@ class MultiExchangeScanner:
                     exchange_name, self.FALLBACK_FEE
                 )
 
-            logger.info(f"{exchange_name}: {len(usdt_pairs)} paires USDT (fee: {self._fee_cache.get(exchange_name, '?')}%)")
+            susp_count = len(suspended)
+            logger.info(
+                f"{exchange_name}: {len(usdt_pairs)} paires USDT "
+                f"(fee: {self._fee_cache.get(exchange_name, '?')}%"
+                f"{f', {susp_count} suspendues' if susp_count else ''})"
+            )
             return usdt_pairs
         except Exception as e:
             logger.warning(f"Erreur chargement marchés {exchange_name}: {e}")
             return set()
+
+    @staticmethod
+    def _detect_suspension(exchange_name: str, info: dict, is_active: bool) -> str:
+        """
+        Détecte si le trading est suspendu pour une paire sur un exchange.
+        Retourne la raison de la suspension ou "" si le trading est actif.
+        Chaque exchange expose cette info différemment dans market['info'].
+        """
+        if not is_active:
+            return "trading inactive"
+
+        # ── HTX (ex-Huobi) ──
+        # info['state'] = 'online' | 'suspend' | 'offline'
+        if exchange_name == "htx":
+            state = str(info.get("state", "") or info.get("status", "")).lower()
+            if state in ("suspend", "suspended", "offline"):
+                return f"trading {state}"
+
+        # ── Gate.io ──
+        # info['trade_disabled'] = True/False
+        if exchange_name == "gate":
+            if info.get("trade_disabled"):
+                return "trade disabled"
+            if str(info.get("trade_status", "")).lower() == "untradable":
+                return "untradable"
+
+        # ── KuCoin ──
+        # info['enableTrading'] = True/False
+        if exchange_name == "kucoin":
+            if info.get("enableTrading") is False:
+                return "trading disabled"
+
+        # ── OKX ──
+        # info['state'] = 'live' | 'suspend' | 'preopen'
+        if exchange_name == "okx":
+            state = str(info.get("state", "")).lower()
+            if state in ("suspend", "suspended"):
+                return f"trading {state}"
+
+        # ── Binance ──
+        # info['status'] = 'TRADING' | 'HALT' | 'BREAK'
+        if exchange_name == "binance":
+            status = str(info.get("status", "")).upper()
+            if status in ("HALT", "BREAK"):
+                return f"trading {status.lower()}"
+
+        # ── Bybit ──
+        # info['status'] = 'Trading' | 'Settling' | 'Closed'
+        if exchange_name == "bybit":
+            status = str(info.get("status", "")).lower()
+            if status in ("settling", "closed"):
+                return f"trading {status}"
+
+        # ── MEXC ──
+        if exchange_name == "mexc":
+            state = str(info.get("state", "")).lower()
+            if state in ("suspend", "suspended"):
+                return f"trading {state}"
+
+        # ── Bitget ──
+        if exchange_name == "bitget":
+            status = str(info.get("status", "")).lower()
+            if status == "offline":
+                return "trading offline"
+
+        # ── Générique: champs communs ──
+        for key in ("tradingEnabled", "trade_status", "trading"):
+            val = info.get(key)
+            if val is False:
+                return "trading disabled"
+            if isinstance(val, str) and val.lower() in ("disabled", "suspended", "halt"):
+                return f"trading {val.lower()}"
+
+        return ""
 
     def discover_tokens(self, min_exchanges: int = 3) -> list[str]:
         """
@@ -198,6 +298,12 @@ class MultiExchangeScanner:
             self.DEFAULT_TAKER_FEES.get(exchange_name, self.FALLBACK_FEE),
         )
 
+    def is_suspended(self, exchange_name: str, symbol: str) -> tuple[bool, str]:
+        """Vérifie si une paire est suspendue sur un exchange. Retourne (suspended, reason)."""
+        susp = self._suspended_pairs.get(exchange_name, {})
+        reason = susp.get(symbol, "")
+        return (bool(reason), reason)
+
     def _fetch_ticker(self, exchange_name: str, symbol: str) -> ExchangePrice | None:
         """Récupère le prix d'un token sur un exchange."""
         # Skip si on sait que le token n'est pas listé
@@ -209,6 +315,9 @@ class MultiExchangeScanner:
         if not ex:
             return None
 
+        # Vérifier suspension
+        is_susp, susp_reason = self.is_suspended(exchange_name, symbol)
+
         try:
             ticker = ex.fetch_ticker(symbol)
             return ExchangePrice(
@@ -219,6 +328,8 @@ class MultiExchangeScanner:
                 last=ticker.get("last") or 0,
                 volume_24h=ticker.get("quoteVolume") or 0,
                 available=True,
+                suspended=is_susp,
+                suspend_reason=susp_reason,
             )
         except (ccxt.BadSymbol, ccxt.BadRequest):
             return None
@@ -358,8 +469,26 @@ class MultiExchangeScanner:
         if len(prices) < 2:
             return None
 
-        best_buy = min(prices, key=lambda p: p.ask)
-        best_sell = max(prices, key=lambda p: p.bid)
+        # ── Collecter les suspensions pour info ──
+        suspended_exchanges = []
+        for p in prices:
+            if p.suspended:
+                suspended_exchanges.append({
+                    "exchange": p.exchange,
+                    "reason": p.suspend_reason,
+                })
+
+        # ── Séparer les prix actifs des suspendus ──
+        active_prices = [p for p in prices if not p.suspended]
+        suspended_prices = [p for p in prices if p.suspended]
+
+        # Si moins de 2 exchanges actifs, pas d'arbitrage possible
+        if len(active_prices) < 2:
+            return None
+
+        # ── Calcul d'arbitrage sur les exchanges actifs uniquement ──
+        best_buy = min(active_prices, key=lambda p: p.ask)
+        best_sell = max(active_prices, key=lambda p: p.bid)
 
         spread = best_sell.bid - best_buy.ask
         spread_pct = (spread / best_buy.ask * 100) if best_buy.ask > 0 else 0
@@ -379,8 +508,10 @@ class MultiExchangeScanner:
                 "ask": p.ask,
                 "last": p.last,
                 "volume_24h": p.volume_24h,
+                "suspended": p.suspended,
+                "suspend_reason": p.suspend_reason,
             }
-            for p in sorted(prices, key=lambda p: p.ask)
+            for p in sorted(active_prices + suspended_prices, key=lambda p: p.ask)
         ]
 
         # ── Frais de trading ──
@@ -404,7 +535,7 @@ class MultiExchangeScanner:
             spread=spread,
             spread_pct=spread_pct,
             all_prices=all_prices_data,
-            num_exchanges=len(prices),
+            num_exchanges=len(active_prices),
             buy_fee_pct=buy_fee_pct,
             sell_fee_pct=sell_fee_pct,
             total_fees_pct=total_fees_pct,
@@ -413,6 +544,7 @@ class MultiExchangeScanner:
             ema_trend=indicators.get("ema_trend", ""),
             ema_9=indicators.get("ema_9"),
             ema_21=indicators.get("ema_21"),
+            suspended_exchanges=suspended_exchanges,
         )
 
     def scan_all(self, max_tokens: int = 0) -> list[ArbitrageOpportunity]:

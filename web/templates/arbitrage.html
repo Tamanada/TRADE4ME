@@ -726,6 +726,37 @@
         .auto-log-entry .status-dot.success { background: var(--green); }
         .auto-log-entry .status-dot.failed { background: var(--red); }
         .auto-log-entry .status-dot.skipped { background: var(--text-dim); }
+
+        /* Suspension badges */
+        .suspended-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            background: rgba(239,68,68,0.12);
+            color: var(--red);
+            border: 1px solid rgba(239,68,68,0.25);
+        }
+        .suspended-banner {
+            padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(239,68,68,0.06);
+            border-top: 1px solid rgba(239,68,68,0.15);
+            font-size: 11px;
+            color: var(--red);
+        }
+        .suspended-banner .label { font-weight: 700; }
+        .exchange-chip.suspended {
+            background: rgba(239,68,68,0.08);
+            color: var(--red);
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
     </style>
 </head>
 <body>
@@ -1310,13 +1341,26 @@ function renderCards(opps) {
         const badgeClass = netSpread >= 0 ? 'spread-positive' : 'spread-negative';
         const priceDecimals = opp.buy_price >= 1 ? 2 : 6;
 
-        // Exchange chips
+        // Exchange chips (with suspension indication)
         const chips = (opp.all_prices || []).map((p, i) => {
             let cls = 'exchange-chip';
+            if (p.suspended) {
+                cls += ' suspended';
+                return `<span class="${cls}" title="${p.suspend_reason || 'Trading suspendu'}">&#9888; ${p.exchange} ${fmt(p.ask, priceDecimals)}</span>`;
+            }
             if (p.exchange === opp.buy_exchange) cls += ' cheapest';
             if (p.exchange === opp.sell_exchange) cls += ' expensive';
             return `<span class="${cls}">${p.exchange} ${fmt(p.ask, priceDecimals)}</span>`;
         }).join('');
+
+        // Suspension banner
+        const suspExchanges = opp.suspended_exchanges || [];
+        const suspBanner = suspExchanges.length > 0
+            ? `<div class="suspended-banner">
+                <span class="label">&#9888; SUSPENDU:</span>
+                ${suspExchanges.map(s => `<span>${s.exchange.toUpperCase()} (${s.reason})</span>`).join(' | ')}
+               </div>`
+            : '';
 
         // RSI badge
         let rsiBadge = '';
@@ -1371,6 +1415,7 @@ function renderCards(opps) {
             </div>
             ${indicatorsHtml}
             <div class="arb-exchanges">${chips}</div>
+            ${suspBanner}
             <div class="arb-actions">
                 <button class="btn-buy" style="flex:1;background:var(--orange)" onclick='openBuyModal(${JSON.stringify(opp)})'>
                     EXECUTE: ${opp.buy_exchange.toUpperCase()} &#10132; ${opp.sell_exchange.toUpperCase()}

@@ -377,6 +377,7 @@ def _format_results(results):
             "ema_trend": r.ema_trend,
             "ema_9": r.ema_9,
             "ema_21": r.ema_21,
+            "suspended_exchanges": r.suspended_exchanges or [],
         }
         for r in results
     ]
