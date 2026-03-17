@@ -396,7 +396,7 @@ def _arb_scan_loop():
         try:
             tokens = arb_scanner.get_token_list()
             all_results = []
-            batch_size = 25
+            batch_size = 15
 
             with ThreadPoolExecutor(max_workers=batch_size) as executor:
                 for i in range(0, len(tokens), batch_size):
@@ -410,13 +410,18 @@ def _arb_scan_loop():
                         executor.submit(arb_scanner.scan_token, symbol): symbol
                         for symbol in batch
                     }
-                    for future in as_completed(futures, timeout=60):
-                        try:
-                            result = future.result(timeout=15)
-                            if result:
-                                all_results.append(result)
-                        except Exception:
-                            pass
+                    try:
+                        for future in as_completed(futures, timeout=90):
+                            try:
+                                result = future.result(timeout=15)
+                                if result:
+                                    all_results.append(result)
+                            except Exception:
+                                pass
+                    except TimeoutError:
+                        # Some futures timed out — cancel them and continue
+                        for f in futures:
+                            f.cancel()
 
                     all_results.sort(key=lambda r: r.net_spread_pct, reverse=True)
                     arb_state["opportunities"] = _format_results(all_results)
@@ -472,7 +477,7 @@ def _scan_once_worker():
         # Scan with progressive updates
         tokens = arb_scanner.get_token_list()
         all_results = []
-        batch_size = 25
+        batch_size = 15
 
         with ThreadPoolExecutor(max_workers=batch_size) as executor:
             for i in range(0, len(tokens), batch_size):
@@ -487,13 +492,17 @@ def _scan_once_worker():
                     executor.submit(arb_scanner.scan_token, symbol): symbol
                     for symbol in batch
                 }
-                for future in as_completed(futures, timeout=60):
-                    try:
-                        result = future.result(timeout=15)
-                        if result:
-                            all_results.append(result)
-                    except Exception:
-                        pass
+                try:
+                    for future in as_completed(futures, timeout=90):
+                        try:
+                            result = future.result(timeout=15)
+                            if result:
+                                all_results.append(result)
+                        except Exception:
+                            pass
+                except TimeoutError:
+                    for f in futures:
+                        f.cancel()
 
                 # Update results progressively after each batch
                 all_results.sort(key=lambda r: r.net_spread_pct, reverse=True)
