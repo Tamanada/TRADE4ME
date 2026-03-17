@@ -4,13 +4,16 @@ TRADE4ME Web Dashboard - Flask backend.
 
 import sys
 import os
-import site
 from pathlib import Path
 
-# Ensure user site-packages are available
-user_site = site.getusersitepackages()
-if user_site not in sys.path:
-    sys.path.insert(0, user_site)
+# Ensure user site-packages are available (skip if not supported)
+try:
+    import site
+    user_site = site.getusersitepackages()
+    if user_site not in sys.path:
+        sys.path.insert(0, user_site)
+except Exception:
+    pass
 
 # Ensure project root is on sys.path so 'src' imports work
 PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
