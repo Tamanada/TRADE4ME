@@ -38,3 +38,8 @@ arbitrage:
   max_trade_usdt: 100    # Montant max en USDT par exécution d'arbitrage
   min_spread_pct: 0.3    # Spread minimum requis pour exécuter (%)
   max_slippage_pct: 0.5  # Annuler si le prix a bougé de plus de X% depuis le scan
+  auto_exec:
+    enabled: false              # Auto-execution désactivée par défaut
+    min_net_spread_pct: 1.0     # Spread net minimum pour trigger auto-exec (%)
+    cooldown_sec: 30            # Secondes entre 2 auto-exécutions
+    max_per_cycle: 3            # Max trades auto par cycle de scan

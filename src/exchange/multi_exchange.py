@@ -59,6 +59,11 @@ class ArbitrageOpportunity:
     spread_pct: float
     all_prices: list
     num_exchanges: int = 0  # Nombre d'exchanges où le token est listé
+    # Frais de trading (taker fees en %)
+    buy_fee_pct: float = 0.0
+    sell_fee_pct: float = 0.0
+    total_fees_pct: float = 0.0
+    net_spread_pct: float = 0.0  # spread_pct - total_fees_pct
     # Indicateurs techniques (RSI + EMA trend)
     rsi: float | None = None
     ema_trend: str = ""  # "BULLISH", "BEARISH", or ""
@@ -69,12 +74,23 @@ class ArbitrageOpportunity:
 class MultiExchangeScanner:
     """Scanne plusieurs exchanges pour trouver les meilleurs prix."""
 
+    # Frais taker par défaut (%) si CCXT ne fournit pas l'info
+    DEFAULT_TAKER_FEES = {
+        "binance": 0.10, "bybit": 0.10, "okx": 0.10, "coinbase": 0.40,
+        "kucoin": 0.10, "gate": 0.15, "bitget": 0.10, "mexc": 0.00,
+        "htx": 0.20, "kraken": 0.26, "bitfinex": 0.20, "poloniex": 0.20,
+        "bingx": 0.10, "phemex": 0.10, "lbank": 0.10, "bitmart": 0.25,
+        "ascendex": 0.10, "whitebit": 0.10, "probit": 0.20, "digifinex": 0.20,
+    }
+    FALLBACK_FEE = 0.20  # Fee par défaut si exchange inconnu
+
     def __init__(self, exchanges: list[str] = None, tokens: list[str] = None):
         self.exchange_names = exchanges or TOP_20_EXCHANGES
         self.tokens = tokens  # None = auto-discover
         self.exchanges: dict[str, ccxt.Exchange] = {}
         self.exchange_markets: dict[str, set] = {}  # Marchés par exchange
         self._discovered_tokens: list[str] = []
+        self._fee_cache: dict[str, float] = {}  # exchange_name -> taker fee %
         self._init_exchanges()
 
     def _init_exchanges(self):
@@ -106,7 +122,22 @@ class MultiExchangeScanner:
                 and ex.markets[symbol].get("spot", True)
             }
             self.exchange_markets[exchange_name] = usdt_pairs
-            logger.info(f"{exchange_name}: {len(usdt_pairs)} paires USDT")
+
+            # Cache les frais taker de cet exchange
+            try:
+                fee = (ex.fees or {}).get("trading", {}).get("taker")
+                if fee and fee > 0:
+                    self._fee_cache[exchange_name] = fee * 100  # Convertir en %
+                else:
+                    self._fee_cache[exchange_name] = self.DEFAULT_TAKER_FEES.get(
+                        exchange_name, self.FALLBACK_FEE
+                    )
+            except Exception:
+                self._fee_cache[exchange_name] = self.DEFAULT_TAKER_FEES.get(
+                    exchange_name, self.FALLBACK_FEE
+                )
+
+            logger.info(f"{exchange_name}: {len(usdt_pairs)} paires USDT (fee: {self._fee_cache.get(exchange_name, '?')}%)")
             return usdt_pairs
         except Exception as e:
             logger.warning(f"Erreur chargement marchés {exchange_name}: {e}")
@@ -159,6 +190,13 @@ class MultiExchangeScanner:
         if self._discovered_tokens:
             return self._discovered_tokens
         return self.discover_tokens(min_exchanges=3)
+
+    def get_fee(self, exchange_name: str) -> float:
+        """Retourne le taker fee (%) pour un exchange."""
+        return self._fee_cache.get(
+            exchange_name,
+            self.DEFAULT_TAKER_FEES.get(exchange_name, self.FALLBACK_FEE),
+        )
 
     def _fetch_ticker(self, exchange_name: str, symbol: str) -> ExchangePrice | None:
         """Récupère le prix d'un token sur un exchange."""
@@ -345,6 +383,12 @@ class MultiExchangeScanner:
             for p in sorted(prices, key=lambda p: p.ask)
         ]
 
+        # ── Frais de trading ──
+        buy_fee_pct = self.get_fee(best_buy.exchange)
+        sell_fee_pct = self.get_fee(best_sell.exchange)
+        total_fees_pct = buy_fee_pct + sell_fee_pct
+        net_spread_pct = spread_pct - total_fees_pct
+
         # ── Indicateurs techniques (RSI + EMA trend) ──
         # On fetch sur l'exchange d'achat (le plus pertinent pour décider)
         indicators = self._fetch_indicators(best_buy.exchange, symbol)
@@ -359,6 +403,10 @@ class MultiExchangeScanner:
             spread_pct=spread_pct,
             all_prices=all_prices_data,
             num_exchanges=len(prices),
+            buy_fee_pct=buy_fee_pct,
+            sell_fee_pct=sell_fee_pct,
+            total_fees_pct=total_fees_pct,
+            net_spread_pct=net_spread_pct,
             rsi=indicators.get("rsi"),
             ema_trend=indicators.get("ema_trend", ""),
             ema_9=indicators.get("ema_9"),
@@ -396,6 +444,6 @@ class MultiExchangeScanner:
                     except Exception:
                         pass
 
-        # Trier par spread % décroissant
-        results.sort(key=lambda r: r.spread_pct, reverse=True)
+        # Trier par spread NET % décroissant (après frais)
+        results.sort(key=lambda r: r.net_spread_pct, reverse=True)
         return results

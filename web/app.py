@@ -21,6 +21,7 @@ os.chdir(PROJECT_ROOT)
 import json
 import threading
 import time
+from collections import deque
 import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -79,6 +80,22 @@ arb_state = {
     "scanned_count": 0,
     "scan_progress": "",
 }
+
+# Auto-execution state
+auto_exec_state = {
+    "enabled": False,
+    "min_net_spread_pct": 1.0,
+    "cooldown_sec": 30,
+    "max_per_cycle": 3,
+    "last_exec_time": 0,            # timestamp (time.time())
+    "cycle_exec_count": 0,
+    "last_scan_id": None,
+    "executed_pairs": deque(maxlen=20),  # recent (symbol, buy_ex, sell_ex)
+    "total_auto_executions": 0,
+    "total_auto_profit": 0.0,
+    "auto_exec_log": deque(maxlen=50),   # recent auto-execution results
+}
+auto_exec_lock = threading.Lock()
 
 # Bot components (initialized on start)
 bot_components = {}
@@ -347,6 +364,10 @@ def _format_results(results):
             "sell_price": r.sell_price,
             "spread": round(r.spread, 6),
             "spread_pct": round(r.spread_pct, 3),
+            "buy_fee_pct": round(r.buy_fee_pct, 3),
+            "sell_fee_pct": round(r.sell_fee_pct, 3),
+            "total_fees_pct": round(r.total_fees_pct, 3),
+            "net_spread_pct": round(r.net_spread_pct, 3),
             "all_prices": r.all_prices,
             "num_exchanges": r.num_exchanges,
             "rsi": r.rsi,
@@ -394,7 +415,7 @@ def _arb_scan_loop():
                         except Exception:
                             pass
 
-                all_results.sort(key=lambda r: r.spread_pct, reverse=True)
+                all_results.sort(key=lambda r: r.net_spread_pct, reverse=True)
                 arb_state["opportunities"] = _format_results(all_results)
 
             arb_state["last_scan"] = datetime.now(timezone.utc).isoformat()
@@ -546,6 +567,8 @@ def execute_arbitrage():
     sell_exchange = data.get("sell_exchange")
     sell_price = data.get("sell_price", 0)
     spread_pct = data.get("spread_pct", 0)
+    buy_fee_pct = data.get("buy_fee_pct", 0)
+    sell_fee_pct = data.get("sell_fee_pct", 0)
 
     if not all([symbol, buy_exchange, sell_exchange]):
         return jsonify({"status": "error", "error": "Missing fields"}), 400
@@ -558,6 +581,8 @@ def execute_arbitrage():
         sell_exchange=sell_exchange,
         sell_price=float(sell_price),
         spread_pct=float(spread_pct),
+        buy_fee_pct=float(buy_fee_pct),
+        sell_fee_pct=float(sell_fee_pct),
     )
 
     return jsonify({"status": "ok", "execution": result.to_dict()})
@@ -585,6 +610,130 @@ def confirm_live_mode():
         return jsonify({"status": "ok", "mode": "live"})
     else:
         return jsonify({"status": "error", "error": "Confirmation incorrecte"}), 403
+
+
+# ─── Auto-Execution Routes ────────────────────────────
+
+@app.route("/api/arbitrage/auto-exec-state")
+def get_auto_exec_state():
+    """Retourne l'état de l'auto-exécution."""
+    with auto_exec_lock:
+        return jsonify({
+            "enabled": auto_exec_state["enabled"],
+            "min_net_spread_pct": auto_exec_state["min_net_spread_pct"],
+            "cooldown_sec": auto_exec_state["cooldown_sec"],
+            "max_per_cycle": auto_exec_state["max_per_cycle"],
+            "total_auto_executions": auto_exec_state["total_auto_executions"],
+            "total_auto_profit": round(auto_exec_state["total_auto_profit"], 4),
+            "cycle_exec_count": auto_exec_state["cycle_exec_count"],
+            "log": list(auto_exec_state["auto_exec_log"]),
+        })
+
+
+@app.route("/api/arbitrage/auto-exec-config", methods=["POST"])
+def update_auto_exec_config():
+    """Met à jour la configuration de l'auto-exécution."""
+    _init_arb_executor()
+    data = request.get_json() or {}
+
+    with auto_exec_lock:
+        if "enabled" in data:
+            # Safety: auto-exec only in paper mode
+            if data["enabled"] and not arb_executor.paper_mode:
+                return jsonify({
+                    "status": "error",
+                    "error": "Auto-exec uniquement disponible en paper mode"
+                }), 403
+            auto_exec_state["enabled"] = bool(data["enabled"])
+            if data["enabled"]:
+                # Reset cycle counter when enabling
+                auto_exec_state["cycle_exec_count"] = 0
+                auto_exec_state["executed_pairs"] = deque(maxlen=20)
+
+        if "min_net_spread_pct" in data:
+            auto_exec_state["min_net_spread_pct"] = max(0.1, float(data["min_net_spread_pct"]))
+        if "cooldown_sec" in data:
+            auto_exec_state["cooldown_sec"] = max(5, int(data["cooldown_sec"]))
+        if "max_per_cycle" in data:
+            auto_exec_state["max_per_cycle"] = max(1, min(20, int(data["max_per_cycle"])))
+
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/arbitrage/auto-execute", methods=["POST"])
+def auto_execute_arbitrage():
+    """Exécution automatique sécurisée avec safeguards."""
+    _init_arb_executor()
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "skipped", "reason": "No data"}), 400
+
+    now = time.time()
+
+    with auto_exec_lock:
+        # 1. Check enabled
+        if not auto_exec_state["enabled"]:
+            return jsonify({"status": "skipped", "reason": "Auto-exec désactivé"})
+
+        # 2. Paper mode only
+        if not arb_executor.paper_mode:
+            auto_exec_state["enabled"] = False
+            return jsonify({"status": "skipped", "reason": "Mode live détecté — auto-exec désactivé"})
+
+        # 3. Cooldown
+        elapsed = now - auto_exec_state["last_exec_time"]
+        if elapsed < auto_exec_state["cooldown_sec"]:
+            remaining = int(auto_exec_state["cooldown_sec"] - elapsed)
+            return jsonify({"status": "skipped", "reason": f"Cooldown ({remaining}s restantes)"})
+
+        # 4. Reset cycle count if new scan
+        current_scan = arb_state.get("last_scan")
+        if current_scan != auto_exec_state["last_scan_id"]:
+            auto_exec_state["cycle_exec_count"] = 0
+            auto_exec_state["last_scan_id"] = current_scan
+
+        # 5. Max per cycle
+        if auto_exec_state["cycle_exec_count"] >= auto_exec_state["max_per_cycle"]:
+            return jsonify({"status": "skipped", "reason": f"Max {auto_exec_state['max_per_cycle']} trades/cycle atteint"})
+
+        # 6. Duplicate prevention
+        pair_key = (data.get("symbol"), data.get("buy_exchange"), data.get("sell_exchange"))
+        if pair_key in auto_exec_state["executed_pairs"]:
+            return jsonify({"status": "skipped", "reason": f"Déjà exécuté: {pair_key[0]}"})
+
+        # All checks passed — execute
+        auto_exec_state["last_exec_time"] = now
+
+    # Execute outside lock (may take time)
+    result = arb_executor.execute(
+        symbol=data["symbol"],
+        buy_exchange=data["buy_exchange"],
+        buy_price=float(data.get("buy_price", 0)),
+        sell_exchange=data["sell_exchange"],
+        sell_price=float(data.get("sell_price", 0)),
+        spread_pct=float(data.get("spread_pct", 0)),
+        buy_fee_pct=float(data.get("buy_fee_pct", 0)),
+        sell_fee_pct=float(data.get("sell_fee_pct", 0)),
+    )
+
+    # Update state after execution
+    with auto_exec_lock:
+        auto_exec_state["cycle_exec_count"] += 1
+        auto_exec_state["total_auto_executions"] += 1
+        auto_exec_state["total_auto_profit"] += result.net_profit_usdt
+        auto_exec_state["executed_pairs"].append(pair_key)
+        auto_exec_state["auto_exec_log"].appendleft({
+            "time": datetime.now(timezone.utc).isoformat(),
+            "symbol": data["symbol"],
+            "buy_exchange": data["buy_exchange"],
+            "sell_exchange": data["sell_exchange"],
+            "net_spread_pct": round(float(data.get("net_spread_pct", 0)), 3),
+            "net_profit_usdt": round(result.net_profit_usdt, 4),
+            "status": result.status,
+        })
+
+    return jsonify({"status": "ok", "execution": result.to_dict()})
 
 
 if __name__ == "__main__":

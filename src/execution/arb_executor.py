@@ -38,7 +38,11 @@ class ArbExecutionResult:
     sell_leg: ArbLegResult
     intended_spread_pct: float      # Spread du scan
     actual_spread_pct: float        # Spread réel (prix remplis)
-    net_profit_usdt: float          # Profit estimé en USDT
+    gross_profit_usdt: float        # Profit brut (avant frais)
+    net_profit_usdt: float          # Profit net (après frais)
+    buy_fee_pct: float              # Frais taker buy (%)
+    sell_fee_pct: float             # Frais taker sell (%)
+    total_fees_usdt: float          # Total frais en USDT
     trade_amount_usdt: float        # Montant tradé
     status: str                     # "success", "partial", "failed"
     paper_mode: bool
@@ -71,7 +75,11 @@ class ArbExecutionResult:
             },
             "intended_spread_pct": round(self.intended_spread_pct, 3),
             "actual_spread_pct": round(self.actual_spread_pct, 3),
+            "gross_profit_usdt": round(self.gross_profit_usdt, 4),
             "net_profit_usdt": round(self.net_profit_usdt, 4),
+            "buy_fee_pct": round(self.buy_fee_pct, 3),
+            "sell_fee_pct": round(self.sell_fee_pct, 3),
+            "total_fees_usdt": round(self.total_fees_usdt, 4),
             "trade_amount_usdt": round(self.trade_amount_usdt, 2),
             "status": self.status,
             "paper_mode": self.paper_mode,
@@ -179,7 +187,8 @@ class ArbitrageExecutor:
 
     def execute(self, symbol: str, buy_exchange: str, buy_price: float,
                 sell_exchange: str, sell_price: float,
-                spread_pct: float) -> ArbExecutionResult:
+                spread_pct: float,
+                buy_fee_pct: float = 0.0, sell_fee_pct: float = 0.0) -> ArbExecutionResult:
         """
         Exécute un arbitrage simultané : BUY sur un exchange, SELL sur l'autre.
         Les 2 ordres sont lancés en parallèle via ThreadPoolExecutor.
@@ -200,7 +209,9 @@ class ArbitrageExecutor:
                 id=exec_id, symbol=symbol,
                 buy_leg=failed_leg, sell_leg=failed_leg,
                 intended_spread_pct=spread_pct, actual_spread_pct=0,
-                net_profit_usdt=0, trade_amount_usdt=0,
+                gross_profit_usdt=0, net_profit_usdt=0,
+                buy_fee_pct=buy_fee_pct, sell_fee_pct=sell_fee_pct,
+                total_fees_usdt=0, trade_amount_usdt=0,
                 status="failed", paper_mode=self.paper_mode,
                 executed_at=now,
             )
@@ -230,13 +241,21 @@ class ArbitrageExecutor:
             buy_leg = future_buy.result(timeout=30)
             sell_leg = future_sell.result(timeout=30)
 
-        # Calcul du spread réel
+        # Calcul du spread réel + frais
         if buy_leg.filled_price > 0 and sell_leg.filled_price > 0:
             actual_spread = sell_leg.filled_price - buy_leg.filled_price
             actual_spread_pct = (actual_spread / buy_leg.filled_price * 100)
-            net_profit = actual_spread * amount
+            gross_profit = actual_spread * amount
+
+            # Frais: buy_fee sur le montant acheté, sell_fee sur le montant vendu
+            buy_fee_usdt = (buy_fee_pct / 100) * buy_leg.filled_price * amount
+            sell_fee_usdt = (sell_fee_pct / 100) * sell_leg.filled_price * amount
+            total_fees_usdt = buy_fee_usdt + sell_fee_usdt
+            net_profit = gross_profit - total_fees_usdt
         else:
             actual_spread_pct = 0
+            gross_profit = 0
+            total_fees_usdt = 0
             net_profit = 0
 
         # Status global
@@ -254,7 +273,11 @@ class ArbitrageExecutor:
             sell_leg=sell_leg,
             intended_spread_pct=spread_pct,
             actual_spread_pct=actual_spread_pct,
+            gross_profit_usdt=gross_profit,
             net_profit_usdt=net_profit,
+            buy_fee_pct=buy_fee_pct,
+            sell_fee_pct=sell_fee_pct,
+            total_fees_usdt=total_fees_usdt,
             trade_amount_usdt=trade_usdt,
             status=status,
             paper_mode=self.paper_mode,
@@ -269,7 +292,7 @@ class ArbitrageExecutor:
         logger.info(
             f"Arbitrage {exec_id[:8]}: {status} | "
             f"Spread prévu: {spread_pct:.3f}% → réel: {actual_spread_pct:.3f}% | "
-            f"Profit: ${net_profit:.4f}"
+            f"Brut: ${gross_profit:.4f} - Frais: ${total_fees_usdt:.4f} = Net: ${net_profit:.4f}"
         )
 
         return result

@@ -168,6 +168,32 @@
         .token-name {
             font-size: 18px;
             font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .token-logo {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .token-logo-fallback {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--orange), var(--yellow));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 800;
+            color: #fff;
+            flex-shrink: 0;
         }
 
         .spread-badge {
@@ -400,6 +426,9 @@
         .modal h3 {
             font-size: 18px;
             margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .modal p {
@@ -430,6 +459,273 @@
 
         .modal-actions .btn { flex: 1; padding: 10px; }
         .btn-cancel { background: var(--border); color: var(--text); }
+
+        /* Filter Bar */
+        .filter-bar {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .filter-bar.active { display: block; }
+
+        .filter-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: var(--text-dim);
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            user-select: none;
+        }
+
+        .filter-toggle:hover { color: var(--text); }
+        .filter-toggle .arrow { transition: transform 0.2s; }
+        .filter-toggle .arrow.open { transform: rotate(90deg); }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .filter-group label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .filter-group input[type="range"] {
+            width: 100%;
+            accent-color: var(--orange);
+            cursor: pointer;
+        }
+
+        .filter-value {
+            font-size: 12px;
+            color: var(--orange);
+            font-weight: 700;
+            float: right;
+        }
+
+        .filter-group select {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .filter-checkbox-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 14px;
+            font-size: 11px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-dim);
+            transition: all 0.15s;
+            user-select: none;
+        }
+
+        .filter-chip.active {
+            border-color: var(--orange);
+            background: rgba(249,115,22,0.12);
+            color: var(--orange);
+        }
+
+        .filter-chip:hover { border-color: var(--text-dim); }
+
+        .filter-summary {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .filter-summary strong { color: var(--orange); }
+
+        .btn-reset-filters {
+            padding: 3px 10px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: none;
+            color: var(--text-dim);
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .btn-reset-filters:hover { border-color: var(--red); color: var(--red); }
+
+        /* Tooltips */
+        .info-tip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            color: var(--text-dim);
+            font-size: 9px;
+            font-weight: 700;
+            cursor: help;
+            position: relative;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+
+        .info-tip:hover .tooltip {
+            display: block;
+        }
+
+        .tooltip {
+            display: none;
+            position: absolute;
+            bottom: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 400;
+            color: var(--text);
+            white-space: normal;
+            width: 220px;
+            line-height: 1.5;
+            z-index: 50;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        /* Auto-Exec */
+        .btn-auto-exec {
+            padding: 6px 16px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: transparent;
+            color: var(--text-dim);
+        }
+        .btn-auto-exec.active {
+            background: rgba(249,115,22,0.15);
+            border-color: var(--orange);
+            color: var(--orange);
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 4px rgba(249,115,22,0.2); }
+            50% { box-shadow: 0 0 12px rgba(249,115,22,0.5); }
+        }
+        .auto-exec-stats {
+            font-size: 11px;
+            color: var(--text-dim);
+            padding: 4px 12px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: none;
+        }
+        .auto-exec-stats.visible { display: flex; align-items: center; gap: 8px; }
+        .auto-exec-stats .count { color: var(--orange); font-weight: 700; }
+        .auto-exec-stats .profit { font-weight: 700; }
+
+        .auto-exec-config {
+            display: none;
+            background: rgba(249,115,22,0.05);
+            border: 1px solid rgba(249,115,22,0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+        }
+        .auto-exec-config.visible { display: block; }
+        .auto-exec-config h4 {
+            font-size: 12px;
+            color: var(--orange);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+        .auto-exec-config .config-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .auto-exec-config label {
+            font-size: 11px;
+            color: var(--text-dim);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .auto-exec-config input[type="range"] {
+            width: 100%;
+        }
+
+        .auto-exec-log {
+            margin-top: 20px;
+            display: none;
+        }
+        .auto-exec-log.visible { display: block; }
+        .auto-exec-log h3 {
+            font-size: 14px;
+            color: var(--orange);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .auto-log-entry {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+        .auto-log-entry .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .auto-log-entry .status-dot.success { background: var(--green); }
+        .auto-log-entry .status-dot.failed { background: var(--red); }
+        .auto-log-entry .status-dot.skipped { background: var(--text-dim); }
     </style>
 </head>
 <body>
@@ -442,6 +738,12 @@
         <button id="btn-scan-once" class="btn btn-scan" onclick="scanOnce()">Scan Now</button>
         <button id="btn-auto-start" class="btn btn-start btn-small" onclick="startAutoScan()">Auto Scan</button>
         <button id="btn-auto-stop" class="btn btn-stop btn-small" onclick="stopAutoScan()" style="display:none">Stop Auto</button>
+        <span style="width:1px;height:24px;background:var(--border)"></span>
+        <button id="btn-auto-exec" class="btn-auto-exec" onclick="toggleAutoExec()">&#9889; Auto Exec: OFF</button>
+        <span id="auto-exec-stats" class="auto-exec-stats">
+            <span class="count" id="ae-count">0</span> trades |
+            <span class="profit" id="ae-profit" style="color:var(--text-dim)">$0.00</span>
+        </span>
     </div>
 </div>
 
@@ -463,6 +765,108 @@
             Top 10 affiches: <strong style="color:var(--orange)" id="stat-displayed">0</strong>
         </span>
     </div>
+    <!-- Filter Bar -->
+    <div class="filter-toggle" id="filter-toggle" onclick="toggleFilters()">
+        <span class="arrow" id="filter-arrow">&#9654;</span> Filtres
+        <span id="filter-count" style="display:none;background:var(--orange);color:#fff;border-radius:10px;padding:1px 8px;font-size:10px"></span>
+    </div>
+    <div class="filter-bar" id="filter-bar">
+        <div class="filter-grid">
+            <div class="filter-group">
+                <label>Spread NET minimum
+                    <span class="info-tip">?<span class="tooltip">Difference de prix entre achat et vente APRES deduction des frais de trading. Un spread net de 1% signifie 1% de profit reel sur le trade.</span></span>
+                    <span class="filter-value" id="val-spread-min">0.0%</span>
+                </label>
+                <input type="range" id="filter-spread-min" min="0" max="10" step="0.1" value="0" oninput="updateFilters()">
+            </div>
+            <div class="filter-group">
+                <label>Spread NET maximum
+                    <span class="info-tip">?<span class="tooltip">Limite haute du spread net. Les spreads tres eleves (&gt;10%) sont souvent suspects (tokens differents, faible liquidite).</span></span>
+                    <span class="filter-value" id="val-spread-max">50%</span>
+                </label>
+                <input type="range" id="filter-spread-max" min="0.5" max="50" step="0.5" value="50" oninput="updateFilters()">
+            </div>
+            <div class="filter-group">
+                <label>Profit net
+                    <span class="info-tip">?<span class="tooltip">Filtrer par rentabilite reelle. "Positif" = opportunites qui rapportent apres frais. "Negatif" = celles qui perdent de l'argent.</span></span>
+                </label>
+                <select id="filter-profit" onchange="updateFilters()">
+                    <option value="all">Tous (positif + negatif)</option>
+                    <option value="positive" selected>Profit positif seulement</option>
+                    <option value="negative">Profit negatif seulement</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Tendance EMA
+                    <span class="info-tip">?<span class="tooltip">Moyenne mobile exponentielle 9 et 21 periodes. Haussiere = EMA 9 au-dessus de EMA 21 (momentum acheteur). Baissiere = inverse.</span></span>
+                </label>
+                <select id="filter-trend" onchange="updateFilters()">
+                    <option value="all">Toutes</option>
+                    <option value="BULLISH">Haussiere seulement</option>
+                    <option value="BEARISH">Baissiere seulement</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>RSI
+                    <span class="info-tip">?<span class="tooltip">Relative Strength Index (14 periodes). Survendu (&lt;30) = prix trop bas, rebond probable. Surachete (&gt;70) = prix trop haut, correction probable.</span></span>
+                </label>
+                <select id="filter-rsi" onchange="updateFilters()">
+                    <option value="all">Tous</option>
+                    <option value="oversold">Survendu (&lt; 30)</option>
+                    <option value="overbought">Surachete (&gt; 70)</option>
+                    <option value="neutral">Neutre (30-70)</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Exchanges min
+                    <span class="info-tip">?<span class="tooltip">Nombre minimum d'exchanges ou le token est liste. Plus il y en a, plus le prix est fiable et la liquidite elevee.</span></span>
+                    <span class="filter-value" id="val-exchanges-min">2</span>
+                </label>
+                <input type="range" id="filter-exchanges-min" min="2" max="15" step="1" value="2" oninput="updateFilters()">
+            </div>
+        </div>
+        <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div>
+                <label style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;display:block;margin-bottom:6px">Exchanges ACHAT (buy)
+                    <span class="info-tip">?<span class="tooltip">Selectionner les exchanges sur lesquels vous acceptez d'ACHETER. Desactivez un exchange pour ne jamais acheter dessus.</span></span>
+                </label>
+                <div class="filter-checkbox-row" id="exchange-chips-buy"></div>
+            </div>
+            <div>
+                <label style="font-size:11px;color:var(--red);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;display:block;margin-bottom:6px">Exchanges VENTE (sell)
+                    <span class="info-tip">?<span class="tooltip">Selectionner les exchanges sur lesquels vous acceptez de VENDRE. Desactivez un exchange pour ne jamais vendre dessus.</span></span>
+                </label>
+                <div class="filter-checkbox-row" id="exchange-chips-sell"></div>
+            </div>
+        </div>
+        <div class="filter-summary">
+            <span>Affichage: <strong id="filter-shown">0</strong> / <strong id="filter-total">0</strong> opportunites</span>
+            <button class="btn-reset-filters" onclick="resetFilters()">Reset filtres</button>
+        </div>
+    </div>
+
+    <!-- Auto-Exec Config Panel -->
+    <div id="auto-exec-config" class="auto-exec-config">
+        <h4>&#9889; Configuration Auto-Execution (Paper Mode)</h4>
+        <div class="config-grid">
+            <label>Seuil spread net minimum
+                <span class="info-tip">?<span class="tooltip">Spread net minimum pour declencher une execution automatique. Plus eleve = plus selectif.</span></span>
+                <span style="color:var(--orange);font-weight:700" id="ae-val-spread">1.0%</span>
+                <input type="range" id="ae-spread-min" min="0.1" max="10" step="0.1" value="1.0" oninput="updateAutoExecConfig()">
+            </label>
+            <label>Cooldown entre trades
+                <span class="info-tip">?<span class="tooltip">Temps d'attente minimum entre 2 executions automatiques. Evite de trader trop vite.</span></span>
+                <span style="color:var(--orange);font-weight:700" id="ae-val-cooldown">30s</span>
+                <input type="range" id="ae-cooldown" min="5" max="120" step="5" value="30" oninput="updateAutoExecConfig()">
+            </label>
+            <label>Max trades par cycle
+                <span class="info-tip">?<span class="tooltip">Nombre maximum de trades automatiques par cycle de scan complet. Limite le risque.</span></span>
+                <span style="color:var(--orange);font-weight:700" id="ae-val-max">3</span>
+                <input type="range" id="ae-max-cycle" min="1" max="10" step="1" value="3" oninput="updateAutoExecConfig()">
+            </label>
+        </div>
+    </div>
+
     <div id="cards-container" class="cards-grid">
         <div class="empty">
             Cliquez sur <strong>Scan Now</strong> pour decouvrir et scanner tous les tokens<br>
@@ -478,6 +882,12 @@
     <div id="exec-history" style="margin-top:24px;display:none">
         <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-dim)">Historique des executions</h3>
         <div id="exec-history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <!-- Auto-Exec Log -->
+    <div id="auto-exec-log" class="auto-exec-log">
+        <h3>&#9889; Auto-Execution Log <span id="ae-log-count" style="font-size:11px;color:var(--text-dim);font-weight:400"></span></h3>
+        <div id="auto-exec-log-list"></div>
     </div>
 </div>
 
@@ -500,8 +910,168 @@
 let currentOpp = null;
 let execState = { mode: 'paper', max_trade_usdt: 100 };
 
+// Auto-exec state
+let autoExecEnabled = false;
+let autoExecBusy = false;  // Prevent concurrent auto-exec calls
+let autoExecLog = [];
+
+// Token logo URL from cryptocurrency-icons CDN (GitHub)
+function tokenLogoUrl(symbol) {
+    const ticker = symbol.replace('/USDT', '').toLowerCase();
+    return `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${ticker}.png`;
+}
+
+// Generate logo HTML with fallback to initials on error
+function tokenLogoHtml(symbol, size) {
+    size = size || 28;
+    const ticker = symbol.replace('/USDT', '');
+    const initials = ticker.slice(0, 2);
+    const url = tokenLogoUrl(symbol);
+    return `<img src="${url}" alt="${ticker}" class="token-logo" style="width:${size}px;height:${size}px"
+        onerror="this.outerHTML='<span class=\\'token-logo-fallback\\' style=\\'width:${size}px;height:${size}px;font-size:${Math.round(size*0.4)}px\\'>${initials}</span>'">`
+}
+
+// Filter state
+let allOpportunities = [];  // All unfiltered opportunities from server
+let excludedBuyExchanges = new Set();
+let excludedSellExchanges = new Set();
+let filtersOpen = false;
+
 // Load exec state on page load
 fetch('/api/arbitrage/exec-state').then(r=>r.json()).then(d => { execState = d; }).catch(()=>{});
+
+function toggleFilters() {
+    filtersOpen = !filtersOpen;
+    document.getElementById('filter-bar').classList.toggle('active', filtersOpen);
+    document.getElementById('filter-arrow').classList.toggle('open', filtersOpen);
+}
+
+function updateFilters() {
+    // Update display values
+    const spreadMin = parseFloat(document.getElementById('filter-spread-min').value);
+    const spreadMax = parseFloat(document.getElementById('filter-spread-max').value);
+    const exMin = parseInt(document.getElementById('filter-exchanges-min').value);
+    document.getElementById('val-spread-min').textContent = spreadMin.toFixed(1) + '%';
+    document.getElementById('val-spread-max').textContent = spreadMax.toFixed(1) + '%';
+    document.getElementById('val-exchanges-min').textContent = exMin;
+
+    // Re-render with filters
+    renderCards(allOpportunities);
+
+    // Update filter count badge
+    const activeCount = countActiveFilters();
+    const badge = document.getElementById('filter-count');
+    if (activeCount > 0) {
+        badge.textContent = activeCount;
+        badge.style.display = '';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function countActiveFilters() {
+    let count = 0;
+    if (parseFloat(document.getElementById('filter-spread-min').value) > 0) count++;
+    if (parseFloat(document.getElementById('filter-spread-max').value) < 50) count++;
+    if (document.getElementById('filter-profit').value !== 'all') count++;
+    if (document.getElementById('filter-trend').value !== 'all') count++;
+    if (document.getElementById('filter-rsi').value !== 'all') count++;
+    if (parseInt(document.getElementById('filter-exchanges-min').value) > 2) count++;
+    if (excludedBuyExchanges.size > 0) count++;
+    if (excludedSellExchanges.size > 0) count++;
+    return count;
+}
+
+function resetFilters() {
+    document.getElementById('filter-spread-min').value = 0;
+    document.getElementById('filter-spread-max').value = 50;
+    document.getElementById('filter-profit').value = 'positive';
+    document.getElementById('filter-trend').value = 'all';
+    document.getElementById('filter-rsi').value = 'all';
+    document.getElementById('filter-exchanges-min').value = 2;
+    excludedBuyExchanges.clear();
+    excludedSellExchanges.clear();
+    buildExchangeChips(allOpportunities);
+    updateFilters();
+}
+
+function toggleExchange(side, name) {
+    const set = side === 'buy' ? excludedBuyExchanges : excludedSellExchanges;
+    if (set.has(name)) {
+        set.delete(name);
+    } else {
+        set.add(name);
+    }
+    buildExchangeChips(allOpportunities);
+    updateFilters();
+}
+
+function buildExchangeChips(opps) {
+    // Collect unique exchanges appearing as buy or sell
+    const buyExchanges = new Set();
+    const sellExchanges = new Set();
+    (opps || []).forEach(opp => {
+        buyExchanges.add(opp.buy_exchange);
+        sellExchanges.add(opp.sell_exchange);
+        // Also add all exchanges that appear in all_prices
+        (opp.all_prices || []).forEach(p => {
+            buyExchanges.add(p.exchange);
+            sellExchanges.add(p.exchange);
+        });
+    });
+
+    const sortedBuy = Array.from(buyExchanges).sort();
+    const sortedSell = Array.from(sellExchanges).sort();
+
+    document.getElementById('exchange-chips-buy').innerHTML = sortedBuy.map(name => {
+        const active = !excludedBuyExchanges.has(name);
+        return `<span class="filter-chip ${active ? 'active' : ''}" onclick="toggleExchange('buy','${name}')">${name}</span>`;
+    }).join('');
+
+    document.getElementById('exchange-chips-sell').innerHTML = sortedSell.map(name => {
+        const active = !excludedSellExchanges.has(name);
+        return `<span class="filter-chip ${active ? 'active' : ''}" onclick="toggleExchange('sell','${name}')">${name}</span>`;
+    }).join('');
+}
+
+function applyFilters(opps) {
+    const spreadMin = parseFloat(document.getElementById('filter-spread-min').value);
+    const spreadMax = parseFloat(document.getElementById('filter-spread-max').value);
+    const profitFilter = document.getElementById('filter-profit').value;
+    const trendFilter = document.getElementById('filter-trend').value;
+    const rsiFilter = document.getElementById('filter-rsi').value;
+    const exMin = parseInt(document.getElementById('filter-exchanges-min').value);
+
+    return opps.filter(opp => {
+        const net = opp.net_spread_pct != null ? opp.net_spread_pct : opp.spread_pct;
+
+        // Spread range
+        if (net < spreadMin || net > spreadMax) return false;
+
+        // Profit filter
+        if (profitFilter === 'positive' && net < 0) return false;
+        if (profitFilter === 'negative' && net >= 0) return false;
+
+        // Trend
+        if (trendFilter !== 'all' && opp.ema_trend !== trendFilter) return false;
+
+        // RSI
+        if (rsiFilter !== 'all' && opp.rsi != null) {
+            if (rsiFilter === 'oversold' && opp.rsi > 30) return false;
+            if (rsiFilter === 'overbought' && opp.rsi < 70) return false;
+            if (rsiFilter === 'neutral' && (opp.rsi < 30 || opp.rsi > 70)) return false;
+        }
+
+        // Min exchanges
+        if ((opp.num_exchanges || 0) < exMin) return false;
+
+        // Excluded buy/sell exchanges
+        if (excludedBuyExchanges.has(opp.buy_exchange)) return false;
+        if (excludedSellExchanges.has(opp.sell_exchange)) return false;
+
+        return true;
+    });
+}
 
 function fmt(n, decimals) {
     if (n >= 1) return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -549,21 +1119,28 @@ async function stopAutoScan() {
 
 function openBuyModal(opp) {
     currentOpp = opp;
-    document.getElementById('modal-title').textContent = `Executer Arbitrage: ${opp.symbol}`;
+    document.getElementById('modal-title').innerHTML = `${tokenLogoHtml(opp.symbol, 24)} Executer Arbitrage: ${opp.symbol.replace('/USDT','')}`;
     document.getElementById('modal-desc').textContent =
         `Achat simultane sur ${opp.buy_exchange.toUpperCase()} + vente sur ${opp.sell_exchange.toUpperCase()}`;
 
     const tradeUsdt = execState.max_trade_usdt || 100;
     const amount = tradeUsdt / opp.buy_price;
-    const estimatedProfit = (opp.spread_pct / 100) * tradeUsdt;
+    const grossProfit = (opp.spread_pct / 100) * tradeUsdt;
+    const totalFeesUsdt = ((opp.buy_fee_pct || 0) + (opp.sell_fee_pct || 0)) / 100 * tradeUsdt;
+    const netProfit = grossProfit - totalFeesUsdt;
+    const netSpread = (opp.net_spread_pct != null) ? opp.net_spread_pct : opp.spread_pct;
 
     document.getElementById('modal-detail').innerHTML = `
         <div><span>Token</span><strong>${opp.symbol}</strong></div>
         <div><span>BUY</span><strong style="color:var(--green)">${opp.buy_exchange.toUpperCase()} @ ${fmt(opp.buy_price)}</strong></div>
         <div><span>SELL</span><strong style="color:var(--red)">${opp.sell_exchange.toUpperCase()} @ ${fmt(opp.sell_price)}</strong></div>
-        <div><span>Spread</span><strong style="color:${spreadColor(opp.spread_pct)}">${opp.spread_pct.toFixed(3)}%</strong></div>
-        <div><span>Montant</span><strong>$${tradeUsdt} (${amount.toFixed(4)} tokens)</strong></div>
-        <div><span>Profit estime</span><strong style="color:var(--green)">~$${estimatedProfit.toFixed(4)}</strong></div>
+        <div><span>Spread brut</span><strong>${opp.spread_pct.toFixed(3)}%</strong></div>
+        <div><span>Frais</span><strong style="color:var(--yellow)">-${((opp.buy_fee_pct||0) + (opp.sell_fee_pct||0)).toFixed(2)}% (${opp.buy_exchange} ${(opp.buy_fee_pct||0).toFixed(2)}% + ${opp.sell_exchange} ${(opp.sell_fee_pct||0).toFixed(2)}%)</strong></div>
+        <div><span>Spread NET</span><strong style="color:${spreadColor(netSpread)}">${netSpread.toFixed(3)}%</strong></div>
+        <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px"><span>Montant</span><strong>$${tradeUsdt} (${amount.toFixed(4)} tokens)</strong></div>
+        <div><span>Profit brut</span><strong>~$${grossProfit.toFixed(4)}</strong></div>
+        <div><span>Frais totaux</span><strong style="color:var(--yellow)">-$${totalFeesUsdt.toFixed(4)}</strong></div>
+        <div><span>Profit NET</span><strong style="color:${netProfit >= 0 ? 'var(--green)' : 'var(--red)'}">~$${netProfit.toFixed(4)}</strong></div>
     `;
 
     const modeBadge = execState.mode === 'paper'
@@ -604,6 +1181,8 @@ async function executeArbitrage() {
                 sell_exchange: currentOpp.sell_exchange,
                 sell_price: currentOpp.sell_price,
                 spread_pct: currentOpp.spread_pct,
+                buy_fee_pct: currentOpp.buy_fee_pct || 0,
+                sell_fee_pct: currentOpp.sell_fee_pct || 0,
             }),
         });
 
@@ -636,7 +1215,15 @@ async function executeArbitrage() {
                     <strong style="color:${spreadColor(exec.actual_spread_pct)}">${exec.actual_spread_pct.toFixed(3)}%</strong>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:3px 0;">
-                    <span>Profit</span>
+                    <span>Profit brut</span>
+                    <strong>$${(exec.gross_profit_usdt || 0).toFixed(4)}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:3px 0;">
+                    <span>Frais (${(exec.buy_fee_pct||0).toFixed(2)}% + ${(exec.sell_fee_pct||0).toFixed(2)}%)</span>
+                    <strong style="color:var(--yellow)">-$${(exec.total_fees_usdt || 0).toFixed(4)}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:3px 0;border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
+                    <span>Profit NET</span>
                     <strong style="color:${exec.net_profit_usdt >= 0 ? 'var(--green)' : 'var(--red)'}">$${exec.net_profit_usdt.toFixed(4)}</strong>
                 </div>
             </div>
@@ -672,12 +1259,12 @@ async function loadExecutionHistory() {
             const modeTag = exec.paper_mode ? 'PAPER' : 'LIVE';
             return `
                 <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12px;">
-                    <span style="font-weight:700;width:80px">${exec.symbol.replace('/USDT','')}</span>
+                    <span style="font-weight:700;width:100px;display:flex;align-items:center;gap:6px">${tokenLogoHtml(exec.symbol, 20)} ${exec.symbol.replace('/USDT','')}</span>
                     <span style="color:var(--green)">${exec.buy_leg.exchange} ${fmt(exec.buy_leg.filled_price)}</span>
                     <span style="color:var(--text-dim)">&#10132;</span>
                     <span style="color:var(--red)">${exec.sell_leg.exchange} ${fmt(exec.sell_leg.filled_price)}</span>
                     <span style="color:${statusColor};font-weight:600">${exec.actual_spread_pct.toFixed(3)}%</span>
-                    <span style="color:${exec.net_profit_usdt >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:600">$${exec.net_profit_usdt.toFixed(4)}</span>
+                    <span style="color:${exec.net_profit_usdt >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:600">Net $${exec.net_profit_usdt.toFixed(4)}</span>
                     <span style="color:var(--text-dim)">${modeTag}</span>
                     <span style="color:var(--text-dim)">${fmtTime(exec.executed_at)}</span>
                 </div>
@@ -694,16 +1281,33 @@ function renderCards(opps) {
 
     if (!opps || opps.length === 0) {
         container.innerHTML = '<div class="empty">Aucune opportunite trouvee. Relancez le scan.</div>';
+        document.getElementById('filter-shown').textContent = '0';
+        document.getElementById('filter-total').textContent = '0';
         return;
     }
 
-    // Top 10 seulement
-    const top10 = opps.slice(0, 10);
+    // Build exchange chips if first time
+    if (document.getElementById('exchange-chips-buy').children.length === 0) {
+        buildExchangeChips(opps);
+    }
+
+    // Apply filters then take top 10
+    const filtered = applyFilters(opps);
+    const top10 = filtered.slice(0, 10);
+
     document.getElementById('stat-displayed').textContent = top10.length;
+    document.getElementById('filter-shown').textContent = filtered.length;
+    document.getElementById('filter-total').textContent = opps.length;
+
+    if (top10.length === 0) {
+        container.innerHTML = '<div class="empty">Aucune opportunite ne correspond aux filtres. Ajustez les filtres.</div>';
+        return;
+    }
 
     container.innerHTML = top10.map(opp => {
-        const color = spreadColor(opp.spread_pct);
-        const badgeClass = opp.spread_pct >= 0 ? 'spread-positive' : 'spread-negative';
+        const netSpread = opp.net_spread_pct != null ? opp.net_spread_pct : opp.spread_pct;
+        const color = spreadColor(netSpread);
+        const badgeClass = netSpread >= 0 ? 'spread-positive' : 'spread-negative';
         const priceDecimals = opp.buy_price >= 1 ? 2 : 6;
 
         // Exchange chips
@@ -740,11 +1344,17 @@ function renderCards(opps) {
         return `
         <div class="arb-card">
             <div class="spread-bar">
-                <div class="spread-bar-fill" style="width:${spreadBarWidth(opp.spread_pct)};background:${color}"></div>
+                <div class="spread-bar-fill" style="width:${spreadBarWidth(netSpread)};background:${color}"></div>
             </div>
             <div class="arb-card-header">
-                <span class="token-name">${opp.symbol.replace('/USDT', '')} <span style="font-size:11px;color:var(--text-dim);font-weight:400">${opp.num_exchanges || ''} exchanges</span></span>
-                <span class="spread-badge ${badgeClass}">${opp.spread_pct >= 0 ? '+' : ''}${opp.spread_pct.toFixed(3)}%</span>
+                <span class="token-name">
+                    ${tokenLogoHtml(opp.symbol, 28)}
+                    <span>${opp.symbol.replace('/USDT', '')} <span style="font-size:11px;color:var(--text-dim);font-weight:400">${opp.num_exchanges || ''} exchanges</span></span>
+                </span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+                    <span class="spread-badge ${badgeClass}">Net ${netSpread >= 0 ? '+' : ''}${netSpread.toFixed(3)}%</span>
+                    <span style="font-size:10px;color:var(--text-dim)">Brut ${opp.spread_pct.toFixed(3)}% - Frais ${(opp.total_fees_pct || 0).toFixed(2)}%</span>
+                </span>
             </div>
             <div class="arb-trade-row">
                 <div class="trade-side buy-side">
@@ -824,14 +1434,186 @@ async function pollArbitrage() {
             errBox.style.display = 'none';
         }
 
-        // Render cards sorted by spread % (already sorted server-side, updated progressively)
+        // Store raw opps and render with filters
         if (data.opportunities.length > 0) {
-            renderCards(data.opportunities);
+            allOpportunities = data.opportunities;
+            renderCards(allOpportunities);
+
+            // ── Auto-Execution Logic ──
+            if (autoExecEnabled && !autoExecBusy) {
+                const filtered = applyFilters(data.opportunities);
+                const threshold = parseFloat(document.getElementById('ae-spread-min').value) || 1.0;
+                const candidates = filtered.filter(opp => {
+                    const net = opp.net_spread_pct != null ? opp.net_spread_pct : opp.spread_pct;
+                    return net >= threshold;
+                });
+                if (candidates.length > 0) {
+                    autoExecuteBest(candidates[0]);  // Best = highest net spread (already sorted)
+                }
+            }
         }
     } catch (e) {}
 }
 
+// ─── Auto-Execution ─────────────────────
+
+async function toggleAutoExec() {
+    const newState = !autoExecEnabled;
+    try {
+        const res = await fetch('/api/arbitrage/auto-exec-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: newState }),
+        });
+        const data = await res.json();
+        if (data.status === 'error') {
+            alert(data.error);
+            return;
+        }
+        autoExecEnabled = newState;
+        updateAutoExecUI();
+    } catch (e) {
+        console.error('Auto-exec toggle error:', e);
+    }
+}
+
+function updateAutoExecUI() {
+    const btn = document.getElementById('btn-auto-exec');
+    const stats = document.getElementById('auto-exec-stats');
+    const config = document.getElementById('auto-exec-config');
+
+    if (autoExecEnabled) {
+        btn.textContent = '\u26A1 Auto Exec: ON';
+        btn.classList.add('active');
+        config.classList.add('visible');
+    } else {
+        btn.textContent = '\u26A1 Auto Exec: OFF';
+        btn.classList.remove('active');
+        config.classList.remove('visible');
+    }
+}
+
+function updateAutoExecConfig() {
+    const spread = parseFloat(document.getElementById('ae-spread-min').value);
+    const cooldown = parseInt(document.getElementById('ae-cooldown').value);
+    const maxCycle = parseInt(document.getElementById('ae-max-cycle').value);
+
+    document.getElementById('ae-val-spread').textContent = spread.toFixed(1) + '%';
+    document.getElementById('ae-val-cooldown').textContent = cooldown + 's';
+    document.getElementById('ae-val-max').textContent = maxCycle;
+
+    // Send to server
+    fetch('/api/arbitrage/auto-exec-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            min_net_spread_pct: spread,
+            cooldown_sec: cooldown,
+            max_per_cycle: maxCycle,
+        }),
+    }).catch(() => {});
+}
+
+async function autoExecuteBest(opp) {
+    if (autoExecBusy) return;
+    autoExecBusy = true;
+
+    try {
+        const res = await fetch('/api/arbitrage/auto-execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbol: opp.symbol,
+                buy_exchange: opp.buy_exchange,
+                buy_price: opp.buy_price,
+                sell_exchange: opp.sell_exchange,
+                sell_price: opp.sell_price,
+                spread_pct: opp.spread_pct,
+                net_spread_pct: opp.net_spread_pct || opp.spread_pct,
+                buy_fee_pct: opp.buy_fee_pct || 0,
+                sell_fee_pct: opp.sell_fee_pct || 0,
+            }),
+        });
+        const data = await res.json();
+
+        if (data.status === 'ok') {
+            // Successful execution
+            loadExecutionHistory();
+        }
+        // Both 'ok' and 'skipped' are normal - no alert needed
+    } catch (e) {
+        console.error('Auto-exec error:', e);
+    } finally {
+        autoExecBusy = false;
+    }
+}
+
+async function pollAutoExecState() {
+    try {
+        const res = await fetch('/api/arbitrage/auto-exec-state');
+        const data = await res.json();
+
+        autoExecEnabled = data.enabled;
+        updateAutoExecUI();
+
+        // Update stats display
+        const stats = document.getElementById('auto-exec-stats');
+        if (data.total_auto_executions > 0 || autoExecEnabled) {
+            stats.classList.add('visible');
+            document.getElementById('ae-count').textContent = data.total_auto_executions;
+            const profitEl = document.getElementById('ae-profit');
+            profitEl.textContent = '$' + data.total_auto_profit.toFixed(2);
+            profitEl.style.color = data.total_auto_profit >= 0 ? 'var(--green)' : 'var(--red)';
+        } else {
+            stats.classList.remove('visible');
+        }
+
+        // Update log
+        if (data.log && data.log.length > 0) {
+            autoExecLog = data.log;
+            renderAutoExecLog();
+        }
+    } catch (e) {}
+}
+
+function renderAutoExecLog() {
+    const logDiv = document.getElementById('auto-exec-log');
+    const listDiv = document.getElementById('auto-exec-log-list');
+
+    if (!autoExecLog || autoExecLog.length === 0) {
+        logDiv.classList.remove('visible');
+        return;
+    }
+
+    logDiv.classList.add('visible');
+    document.getElementById('ae-log-count').textContent = `(${autoExecLog.length} trades)`;
+
+    listDiv.innerHTML = autoExecLog.slice(0, 20).map(entry => {
+        const dotClass = entry.status === 'success' ? 'success' : entry.status === 'failed' ? 'failed' : 'skipped';
+        const profitColor = entry.net_profit_usdt >= 0 ? 'var(--green)' : 'var(--red)';
+        return `
+            <div class="auto-log-entry">
+                <span style="display:flex;align-items:center;gap:6px;width:120px">
+                    <span class="status-dot ${dotClass}"></span>
+                    ${tokenLogoHtml(entry.symbol, 18)}
+                    <strong>${entry.symbol.replace('/USDT','')}</strong>
+                </span>
+                <span style="color:var(--green);width:80px">${entry.buy_exchange}</span>
+                <span style="color:var(--text-dim)">&#10132;</span>
+                <span style="color:var(--red);width:80px">${entry.sell_exchange}</span>
+                <span style="width:70px">Net ${entry.net_spread_pct.toFixed(2)}%</span>
+                <span style="color:${profitColor};font-weight:700;width:80px">$${entry.net_profit_usdt.toFixed(4)}</span>
+                <span style="color:var(--text-dim)">${fmtTime(entry.time)}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Load auto-exec state on page load
+pollAutoExecState();
+
 setInterval(pollArbitrage, 5000);
+setInterval(pollAutoExecState, 10000);
 pollArbitrage();
 </script>
 

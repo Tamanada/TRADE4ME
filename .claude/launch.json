@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "trade4me-dashboard",
+      "runtimeExecutable": "C:\\Users\\David\\Desktop\\TRADE4ME\\venv\\Scripts\\python.exe",
+      "runtimeArgs": ["C:\\Users\\David\\Desktop\\TRADE4ME\\web\\app.py"],
+      "port": 5000
+    }
+  ]
+}
