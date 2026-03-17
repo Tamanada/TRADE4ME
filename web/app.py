@@ -396,16 +396,16 @@ def _arb_scan_loop():
         try:
             tokens = arb_scanner.get_token_list()
             all_results = []
-            batch_size = 10
+            batch_size = 25
 
-            for i in range(0, len(tokens), batch_size):
-                if not arb_state["scanning"]:
-                    break
-                batch = tokens[i:i + batch_size]
-                arb_state["scanned_count"] = min(i + batch_size, len(tokens))
-                arb_state["scan_progress"] = f"Scan {arb_state['scanned_count']}/{len(tokens)} tokens..."
+            with ThreadPoolExecutor(max_workers=batch_size) as executor:
+                for i in range(0, len(tokens), batch_size):
+                    if not arb_state["scanning"]:
+                        break
+                    batch = tokens[i:i + batch_size]
+                    arb_state["scanned_count"] = min(i + batch_size, len(tokens))
+                    arb_state["scan_progress"] = f"Scan {arb_state['scanned_count']}/{len(tokens)} tokens..."
 
-                with ThreadPoolExecutor(max_workers=batch_size) as executor:
                     futures = {
                         executor.submit(arb_scanner.scan_token, symbol): symbol
                         for symbol in batch
@@ -418,8 +418,8 @@ def _arb_scan_loop():
                         except Exception:
                             pass
 
-                all_results.sort(key=lambda r: r.net_spread_pct, reverse=True)
-                arb_state["opportunities"] = _format_results(all_results)
+                    all_results.sort(key=lambda r: r.net_spread_pct, reverse=True)
+                    arb_state["opportunities"] = _format_results(all_results)
 
             arb_state["last_scan"] = datetime.now(timezone.utc).isoformat()
             arb_state["error"] = None
@@ -472,17 +472,17 @@ def _scan_once_worker():
         # Scan with progressive updates
         tokens = arb_scanner.get_token_list()
         all_results = []
-        batch_size = 10
+        batch_size = 25
 
-        for i in range(0, len(tokens), batch_size):
-            if not arb_state["scanning"]:
-                break  # Allow stopping mid-scan
+        with ThreadPoolExecutor(max_workers=batch_size) as executor:
+            for i in range(0, len(tokens), batch_size):
+                if not arb_state["scanning"]:
+                    break  # Allow stopping mid-scan
 
-            batch = tokens[i:i + batch_size]
-            arb_state["scanned_count"] = min(i + batch_size, len(tokens))
-            arb_state["scan_progress"] = f"Scan {arb_state['scanned_count']}/{len(tokens)} tokens..."
+                batch = tokens[i:i + batch_size]
+                arb_state["scanned_count"] = min(i + batch_size, len(tokens))
+                arb_state["scan_progress"] = f"Scan {arb_state['scanned_count']}/{len(tokens)} tokens..."
 
-            with ThreadPoolExecutor(max_workers=batch_size) as executor:
                 futures = {
                     executor.submit(arb_scanner.scan_token, symbol): symbol
                     for symbol in batch
@@ -495,9 +495,9 @@ def _scan_once_worker():
                     except Exception:
                         pass
 
-            # Update results progressively after each batch
-            all_results.sort(key=lambda r: r.spread_pct, reverse=True)
-            arb_state["opportunities"] = _format_results(all_results)
+                # Update results progressively after each batch
+                all_results.sort(key=lambda r: r.net_spread_pct, reverse=True)
+                arb_state["opportunities"] = _format_results(all_results)
 
         arb_state["last_scan"] = datetime.now(timezone.utc).isoformat()
         arb_state["error"] = None

@@ -332,9 +332,9 @@ class MultiExchangeScanner:
                 executor.submit(self._fetch_ticker, name, symbol): name
                 for name in target_exchanges
             }
-            for future in as_completed(futures, timeout=20):
+            for future in as_completed(futures, timeout=10):
                 try:
-                    result = future.result(timeout=5)
+                    result = future.result(timeout=3)
                     if result and result.available and result.ask > 0 and result.bid > 0:
                         prices.append(result)
                 except Exception:
@@ -390,8 +390,10 @@ class MultiExchangeScanner:
         net_spread_pct = spread_pct - total_fees_pct
 
         # ── Indicateurs techniques (RSI + EMA trend) ──
-        # On fetch sur l'exchange d'achat (le plus pertinent pour décider)
-        indicators = self._fetch_indicators(best_buy.exchange, symbol)
+        # Skip si spread net trop faible (economise ~2-3s par token)
+        indicators = {}
+        if net_spread_pct > 0.1:
+            indicators = self._fetch_indicators(best_buy.exchange, symbol)
 
         return ArbitrageOpportunity(
             symbol=symbol,
