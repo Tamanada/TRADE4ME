@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRADE4ME - BSC Arbitrage Bot</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --orange: #f97316;
+            --yellow: #f59e0b;
+            --green: #10b981;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --purple: #a855f7;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .header h1 span { color: var(--orange); }
+        .header h1 .bsc-tag {
+            color: var(--yellow);
+            font-size: 12px;
+            background: rgba(245,158,11,0.15);
+            padding: 3px 10px;
+            border-radius: 6px;
+            margin-left: 8px;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-link {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .nav-link:hover { color: var(--text); border-color: var(--text-dim); }
+        .nav-link.active { color: var(--orange); border-color: var(--orange); }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .badge-idle { background: rgba(148,163,184,0.15); color: var(--text-dim); }
+        .badge-scanning { background: rgba(59,130,246,0.15); color: var(--blue); }
+        .badge-connected { background: rgba(16,185,129,0.15); color: var(--green); }
+        .badge-error { background: rgba(239,68,68,0.15); color: var(--red); }
+
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-connect { background: var(--yellow); color: #000; }
+        .btn-connect:hover { background: #d97706; }
+        .btn-scan { background: var(--blue); color: #fff; }
+        .btn-scan:hover { background: #2563eb; }
+        .btn-start { background: var(--green); color: #fff; }
+        .btn-start:hover { background: #059669; }
+        .btn-stop { background: var(--red); color: #fff; }
+        .btn-stop:hover { background: #dc2626; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .info-bar {
+            padding: 12px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            background: var(--card);
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .pulse {
+            display: inline-block;
+            width: 8px; height: 8px;
+            background: var(--green);
+            border-radius: 50%;
+            margin-right: 6px;
+            animation: pulse-anim 2s infinite;
+        }
+        @keyframes pulse-anim {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .main { padding: 24px 32px; }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+        }
+
+        .stat-card .label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .stat-card .value {
+            font-size: 22px;
+            font-weight: 800;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stat-card .sub {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        /* Routes Table */
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .routes-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .routes-table th {
+            background: rgba(255,255,255,0.03);
+            padding: 10px 16px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .routes-table td {
+            padding: 10px 16px;
+            font-size: 13px;
+            border-top: 1px solid var(--border);
+        }
+
+        .routes-table tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .route-path {
+            font-weight: 600;
+            color: var(--yellow);
+        }
+
+        .profit-positive { color: var(--green); font-weight: 700; }
+        .profit-negative { color: var(--red); font-weight: 700; }
+        .profit-zero { color: var(--text-dim); }
+
+        /* Trade History */
+        .trade-entry {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .trade-entry .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .status-dot.success { background: var(--green); }
+        .status-dot.failed { background: var(--red); }
+        .status-dot.dry { background: var(--yellow); }
+
+        /* Config Panel */
+        .config-panel {
+            background: rgba(245,158,11,0.05);
+            border: 1px solid rgba(245,158,11,0.2);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+
+        .config-panel h4 {
+            color: var(--yellow);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .config-grid label {
+            font-size: 12px;
+            color: var(--text-dim);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .config-grid input {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .config-grid input:focus {
+            outline: none;
+            border-color: var(--yellow);
+        }
+
+        /* Empty / Loading */
+        .empty {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-dim);
+        }
+
+        .error-box {
+            background: rgba(239,68,68,0.1);
+            border: 1px solid var(--red);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--red);
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+
+        .dry-run-banner {
+            background: rgba(245,158,11,0.1);
+            border: 1px solid rgba(245,158,11,0.3);
+            border-radius: 8px;
+            padding: 10px 16px;
+            color: var(--yellow);
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1><span>TRADE4ME</span> BSC Bot <span class="bsc-tag">PancakeSwap V2</span></h1>
+    <div class="header-right">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/arbitrage" class="nav-link">CEX Arbitrage</a>
+        <span id="status-badge" class="badge badge-idle">DECONNECTE</span>
+        <button id="btn-connect" class="btn btn-connect" onclick="connectBsc()">Connecter BSC</button>
+        <button id="btn-scan" class="btn btn-scan" onclick="scanOnce()" disabled>Scan</button>
+        <button id="btn-start" class="btn btn-start" onclick="startBot()" disabled style="display:none">Start Bot</button>
+        <button id="btn-stop" class="btn btn-stop" onclick="stopBot()" style="display:none">Stop Bot</button>
+    </div>
+</div>
+
+<div class="info-bar">
+    <div id="info-text">Connectez-vous a BSC pour scanner les routes d'arbitrage PancakeSwap</div>
+    <div id="info-right"></div>
+</div>
+
+<div class="main">
+    <div id="error-box" class="error-box" style="display:none"></div>
+    <div id="dry-run-banner" class="dry-run-banner" style="display:none">
+        MODE DRY RUN — Aucune transaction reelle ne sera envoyee. Configurez BSC_PRIVATE_KEY pour trader.
+    </div>
+
+    <!-- Config -->
+    <div class="config-panel">
+        <h4>Configuration</h4>
+        <div class="config-grid">
+            <label>Capital par trade (BNB)
+                <input type="number" id="cfg-capital" value="0.5" min="0.01" max="10" step="0.1">
+            </label>
+            <label>Intervalle scan (ms)
+                <input type="number" id="cfg-interval" value="2000" min="500" max="30000" step="500" disabled>
+            </label>
+            <label>Profit min (USD)
+                <input type="number" id="cfg-min-profit" value="0.50" min="0.01" max="100" step="0.1" disabled>
+            </label>
+            <label>Slippage (%)
+                <input type="number" id="cfg-slippage" value="0.5" min="0.1" max="5" step="0.1" disabled>
+            </label>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid" style="display:none">
+        <div class="stat-card">
+            <div class="label">Bloc BSC</div>
+            <div class="value" id="stat-block">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Prix BNB</div>
+            <div class="value" id="stat-bnb-price">—</div>
+            <div class="sub">USD</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Wallet BNB</div>
+            <div class="value" id="stat-wallet">—</div>
+            <div class="sub" id="stat-wallet-sub"></div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Scans</div>
+            <div class="value" id="stat-scans">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Trades</div>
+            <div class="value" id="stat-trades">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Profit Total</div>
+            <div class="value" id="stat-profit">$0.00</div>
+        </div>
+    </div>
+
+    <!-- Routes scannees -->
+    <div id="routes-section" style="display:none">
+        <div class="section-title">Routes Triangulaires <span style="font-size:12px;color:var(--text-dim);font-weight:400" id="routes-count"></span></div>
+        <table class="routes-table">
+            <thead>
+                <tr>
+                    <th>Route</th>
+                    <th>In (BNB)</th>
+                    <th>Out (BNB)</th>
+                    <th>Profit %</th>
+                    <th>Statut</th>
+                </tr>
+            </thead>
+            <tbody id="routes-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Opportunites viables -->
+    <div id="opps-section" style="display:none">
+        <div class="section-title" style="color:var(--green)">Opportunites Viables <span style="font-size:12px;color:var(--text-dim);font-weight:400" id="opps-count"></span></div>
+        <table class="routes-table">
+            <thead>
+                <tr>
+                    <th>Route</th>
+                    <th>Profit Net</th>
+                    <th>Profit %</th>
+                    <th>Brut</th>
+                    <th>Gas</th>
+                    <th>Capital</th>
+                </tr>
+            </thead>
+            <tbody id="opps-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Trade History -->
+    <div id="history-section" style="display:none">
+        <div class="section-title">Historique des Trades <span style="font-size:12px;color:var(--text-dim);font-weight:400" id="history-count"></span></div>
+        <div id="history-list"></div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="empty">
+        <div style="font-size:48px;margin-bottom:16px">&#9889;</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">Bot d'Arbitrage BSC / PancakeSwap V2</div>
+        <div style="margin-bottom:20px">
+            Detecte les opportunites d'arbitrage triangulaire on-chain<br>
+            WBNB &#8594; Token &#8594; Stable &#8594; WBNB
+        </div>
+        <div style="font-size:12px;color:var(--text-dim)">
+            12 routes triangulaires | CAKE, ETH, BTC, BUSD, USDT, USDC, DAI<br><br>
+            Cliquez sur <strong style="color:var(--yellow)">Connecter BSC</strong> pour commencer
+        </div>
+    </div>
+</div>
+
+<script>
+let connected = false;
+let botRunning = false;
+
+async function connectBsc() {
+    const btn = document.getElementById('btn-connect');
+    btn.disabled = true;
+    btn.textContent = 'Connexion...';
+
+    try {
+        const res = await fetch('/api/bsc/connect', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.status === 'ok') {
+            connected = true;
+            updateUI();
+            document.getElementById('info-text').innerHTML =
+                '<span class="pulse"></span>Connecte a BSC | Bloc: ' + data.block;
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('stats-grid').style.display = '';
+            pollState();
+        } else {
+            showError(data.error || 'Erreur de connexion');
+        }
+    } catch (e) {
+        showError('Impossible de se connecter: ' + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Connecter BSC';
+}
+
+async function scanOnce() {
+    const btn = document.getElementById('btn-scan');
+    btn.disabled = true;
+    btn.textContent = 'Scan...';
+
+    const capital = parseFloat(document.getElementById('cfg-capital').value) || 0.5;
+
+    try {
+        const res = await fetch('/api/bsc/scan-once', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ capital_bnb: capital }),
+        });
+        const data = await res.json();
+
+        if (data.status === 'error') {
+            showError(data.error);
+        }
+
+        // Refresh state
+        await pollState();
+    } catch (e) {
+        showError('Erreur scan: ' + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Scan';
+}
+
+async function startBot() {
+    const capital = parseFloat(document.getElementById('cfg-capital').value) || 0.5;
+
+    try {
+        const res = await fetch('/api/bsc/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ capital_bnb: capital }),
+        });
+        const data = await res.json();
+        if (data.status === 'started' || data.status === 'already_running') {
+            botRunning = true;
+            updateUI();
+        } else {
+            showError(data.error || 'Erreur demarrage');
+        }
+    } catch (e) {
+        showError('Erreur: ' + e.message);
+    }
+}
+
+async function stopBot() {
+    try {
+        await fetch('/api/bsc/stop', { method: 'POST' });
+        botRunning = false;
+        updateUI();
+    } catch (e) {}
+}
+
+async function pollState() {
+    try {
+        const res = await fetch('/api/bsc/state');
+        const data = await res.json();
+
+        connected = data.connected;
+        botRunning = data.running;
+
+        // Stats
+        if (data.connected) {
+            document.getElementById('stats-grid').style.display = '';
+            document.getElementById('empty-state').style.display = 'none';
+
+            document.getElementById('stat-block').textContent = data.block_number?.toLocaleString() || '—';
+            document.getElementById('stat-bnb-price').textContent = data.bnb_price_usd ? '$' + data.bnb_price_usd.toFixed(2) : '—';
+            document.getElementById('stat-scans').textContent = data.scans_count || 0;
+            document.getElementById('stat-trades').textContent = data.trades_count || 0;
+
+            const profitEl = document.getElementById('stat-profit');
+            profitEl.textContent = '$' + (data.total_profit || 0).toFixed(4);
+            profitEl.style.color = data.total_profit >= 0 ? 'var(--green)' : 'var(--red)';
+
+            if (data.wallet_configured) {
+                document.getElementById('stat-wallet').textContent = data.wallet_balance?.toFixed(4) || '0';
+                document.getElementById('stat-wallet-sub').textContent = 'BNB';
+            } else {
+                document.getElementById('stat-wallet').textContent = '—';
+                document.getElementById('stat-wallet-sub').textContent = 'Non configure';
+            }
+
+            // Dry run banner
+            document.getElementById('dry-run-banner').style.display = data.dry_run ? '' : 'none';
+
+            // Info bar
+            if (data.running) {
+                document.getElementById('info-text').innerHTML =
+                    '<span class="pulse"></span>Bot actif | Scan #' + data.scans_count +
+                    ' | Bloc ' + (data.block_number?.toLocaleString() || '');
+            } else if (data.last_scan) {
+                document.getElementById('info-text').textContent =
+                    'Dernier scan: ' + new Date(data.last_scan).toLocaleTimeString('fr-FR') +
+                    ' | ' + (data.routes?.length || 0) + ' routes scannees';
+            }
+
+            if (data.last_scan) {
+                document.getElementById('info-right').textContent =
+                    'BNB: $' + (data.bnb_price_usd || 0).toFixed(2);
+            }
+        }
+
+        // Routes
+        renderRoutes(data.routes || []);
+
+        // Opportunities
+        renderOpportunities(data.opportunities || []);
+
+        // Trade History
+        renderHistory(data.trade_history || []);
+
+        updateUI();
+    } catch (e) {}
+}
+
+function renderRoutes(routes) {
+    const section = document.getElementById('routes-section');
+    const tbody = document.getElementById('routes-body');
+
+    if (!routes || routes.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = '';
+    document.getElementById('routes-count').textContent = '(' + routes.length + ' routes)';
+
+    tbody.innerHTML = routes.map(r => {
+        const profitClass = r.profit_pct > 0 ? 'profit-positive' : r.profit_pct < -0.01 ? 'profit-negative' : 'profit-zero';
+        const statusIcon = r.profit_pct > 0 ? '&#9989;' : '&#10060;';
+        return `<tr>
+            <td class="route-path">${r.path}</td>
+            <td>${r.amount_in_bnb?.toFixed(4) || '—'}</td>
+            <td>${r.amount_out_bnb?.toFixed(6) || '—'}</td>
+            <td class="${profitClass}">${r.profit_pct >= 0 ? '+' : ''}${r.profit_pct?.toFixed(4) || 0}%</td>
+            <td>${statusIcon}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderOpportunities(opps) {
+    const section = document.getElementById('opps-section');
+    const tbody = document.getElementById('opps-body');
+
+    if (!opps || opps.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = '';
+    document.getElementById('opps-count').textContent = '(' + opps.length + ' viables)';
+
+    tbody.innerHTML = opps.map(o => `<tr>
+        <td class="route-path">${o.route}</td>
+        <td class="profit-positive">$${o.profit_net_usd?.toFixed(4)}</td>
+        <td class="profit-positive">${o.profit_net_pct >= 0 ? '+' : ''}${o.profit_net_pct?.toFixed(4)}%</td>
+        <td>$${o.gross_usd?.toFixed(4)}</td>
+        <td style="color:var(--yellow)">-$${o.gas_usd?.toFixed(4)}</td>
+        <td>$${o.capital_usd?.toFixed(2)}</td>
+    </tr>`).join('');
+}
+
+function renderHistory(trades) {
+    const section = document.getElementById('history-section');
+    const list = document.getElementById('history-list');
+
+    if (!trades || trades.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = '';
+    document.getElementById('history-count').textContent = '(' + trades.length + ' trades)';
+
+    list.innerHTML = trades.slice().reverse().map(t => {
+        const dotClass = t.status === 'success' ? (t.dry_run ? 'dry' : 'success') : 'failed';
+        const profitColor = t.profit_net_usd >= 0 ? 'var(--green)' : 'var(--red)';
+        const modeTag = t.dry_run ? 'DRY RUN' : 'LIVE';
+        const time = t.time ? new Date(t.time).toLocaleTimeString('fr-FR') : '';
+        return `<div class="trade-entry">
+            <span style="display:flex;align-items:center;gap:6px;width:200px">
+                <span class="status-dot ${dotClass}"></span>
+                <span class="route-path" style="font-size:11px">${t.route}</span>
+            </span>
+            <span style="color:${profitColor};font-weight:700;width:80px">$${t.profit_net_usd?.toFixed(4)}</span>
+            <span style="width:70px">${t.profit_net_pct?.toFixed(3)}%</span>
+            <span style="color:var(--yellow);width:60px">Gas -$${t.gas_usd?.toFixed(4)}</span>
+            <span style="color:var(--text-dim);width:60px">${modeTag}</span>
+            <span style="color:var(--text-dim)">${time}</span>
+        </div>`;
+    }).join('');
+}
+
+function showError(msg) {
+    const box = document.getElementById('error-box');
+    box.textContent = msg;
+    box.style.display = '';
+    setTimeout(() => { box.style.display = 'none'; }, 10000);
+}
+
+function updateUI() {
+    const badge = document.getElementById('status-badge');
+    const btnConnect = document.getElementById('btn-connect');
+    const btnScan = document.getElementById('btn-scan');
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+
+    if (!connected) {
+        badge.textContent = 'DECONNECTE';
+        badge.className = 'badge badge-idle';
+        btnConnect.style.display = '';
+        btnScan.disabled = true;
+        btnStart.style.display = 'none';
+        btnStop.style.display = 'none';
+    } else if (botRunning) {
+        badge.textContent = 'BOT ACTIF';
+        badge.className = 'badge badge-scanning';
+        btnConnect.style.display = 'none';
+        btnScan.disabled = true;
+        btnStart.style.display = 'none';
+        btnStop.style.display = '';
+    } else {
+        badge.textContent = 'CONNECTE';
+        badge.className = 'badge badge-connected';
+        btnConnect.style.display = 'none';
+        btnScan.disabled = false;
+        btnStart.style.display = '';
+        btnStop.style.display = 'none';
+    }
+}
+
+// Poll every 3 seconds
+setInterval(pollState, 3000);
+</script>
+
+</body>
+</html>

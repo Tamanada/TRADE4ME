@@ -45,6 +45,7 @@ from src.execution.order_manager import OrderManager
 from src.execution.position_tracker import PositionTracker
 from src.risk.manager import RiskManager
 from src.utils.logger import setup_logger
+from src.bsc.bot_engine import ArbBot as BscArbBot
 
 load_dotenv()
 
@@ -107,6 +108,16 @@ arb_scanner = None
 arb_thread = None
 arb_executor = None
 arb_client_pool = None
+
+# BSC Bot state
+bsc_bot: BscArbBot | None = None
+bsc_thread: threading.Thread | None = None
+bsc_state = {
+    "connected": False,
+    "running": False,
+    "error": None,
+    "capital_bnb": 0.5,
+}
 
 
 def load_config():
@@ -747,6 +758,100 @@ def auto_execute_arbitrage():
         })
 
     return jsonify({"status": "ok", "execution": result.to_dict()})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BSC BOT ROUTES
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/bsc")
+def bsc_page():
+    return render_template("bsc.html")
+
+
+@app.route("/api/bsc/state")
+def bsc_get_state():
+    global bsc_bot
+    if bsc_bot is None:
+        return jsonify({
+            "connected": False,
+            "running": False,
+            "error": bsc_state.get("error"),
+            "dry_run": True,
+            "scans_count": 0,
+            "trades_count": 0,
+            "total_profit": 0,
+            "block_number": 0,
+            "bnb_price_usd": 0,
+            "wallet_configured": False,
+            "wallet_balance": 0,
+            "routes": [],
+            "opportunities": [],
+            "trade_history": [],
+            "last_scan": None,
+        })
+    return jsonify(bsc_bot.get_state())
+
+
+@app.route("/api/bsc/connect", methods=["POST"])
+def bsc_connect():
+    """Initialise la connexion BSC (sans démarrer la boucle)."""
+    global bsc_bot
+    try:
+        bsc_bot = BscArbBot()
+        bsc_state["connected"] = True
+        bsc_state["error"] = None
+        return jsonify({"status": "ok", "block": bsc_bot.block_number})
+    except Exception as e:
+        bsc_state["error"] = str(e)
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
+@app.route("/api/bsc/scan-once", methods=["POST"])
+def bsc_scan_once():
+    """Lance un seul cycle de scan BSC."""
+    global bsc_bot
+    if bsc_bot is None:
+        try:
+            bsc_bot = BscArbBot()
+        except Exception as e:
+            return jsonify({"status": "error", "error": str(e)}), 500
+
+    capital = float(request.json.get("capital_bnb", 0.5)) if request.json else 0.5
+    result = bsc_bot.run_cycle(capital)
+    return jsonify(result)
+
+
+@app.route("/api/bsc/start", methods=["POST"])
+def bsc_start():
+    """Démarre la boucle BSC en arrière-plan."""
+    global bsc_bot, bsc_thread
+    if bsc_bot is None:
+        try:
+            bsc_bot = BscArbBot()
+        except Exception as e:
+            return jsonify({"status": "error", "error": str(e)}), 500
+
+    if bsc_bot.running:
+        return jsonify({"status": "already_running"})
+
+    capital = float(request.json.get("capital_bnb", 0.5)) if request.json else 0.5
+    bsc_state["capital_bnb"] = capital
+
+    bsc_thread = threading.Thread(
+        target=bsc_bot.run_loop, args=(capital,), daemon=True
+    )
+    bsc_thread.start()
+    return jsonify({"status": "started"})
+
+
+@app.route("/api/bsc/stop", methods=["POST"])
+def bsc_stop():
+    """Arrête la boucle BSC."""
+    global bsc_bot
+    if bsc_bot:
+        bsc_bot.stop()
+    return jsonify({"status": "stopped"})
 
 
 if __name__ == "__main__":
